@@ -428,6 +428,15 @@
         }
       }
     },
+    "⏭ Next" : {
+      "comment" : "Attract Mode next game button"
+    },
+    "▶ Play This Game" : {
+      "comment" : "Attract Mode keep playing button"
+    },
+    "◉ ATTRACT MODE" : {
+      "comment" : "Attract Mode badge"
+    },
     "⚠️Game might not run correctly." : {
       "localizations" : {
         "ja" : {
@@ -587,6 +596,9 @@
           }
         }
       }
+    },
+    "Ⓐ play · Ⓧ next · any other button to browse ROMs" : {
+      "comment" : "Attract Mode dismiss hint"
     },
     "Add Arguments..." : {
       "localizations" : {
@@ -773,6 +785,15 @@
           }
         }
       }
+    },
+    "Attract Mode off" : {
+      "comment" : "Attract Mode disabled toast"
+    },
+    "Attract Mode Off" : {
+      "comment" : "Attract Mode toggle, off"
+    },
+    "Attract Mode On" : {
+      "comment" : "Attract Mode toggle, on"
     },
     "Auto" : {
       "localizations" : {
@@ -3045,6 +3066,9 @@
           }
         }
       }
+    },
+    "Tap anywhere to browse ROMs" : {
+      "comment" : "Attract Mode dismiss hint"
     },
     "To transfer ROMs from your computer go to one of these addresses in your web browser:\n\n%@" : {
       "localizations" : {

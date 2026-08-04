@@ -17,6 +17,8 @@
 #import "MAME4iOS-Swift.h"
 #import "libmame.h"
 #import "Options.h"
+#import "AttractMode.h"
+#import "UIView+Toast.h"
 
 #if TARGET_OS_IOS
 #import <Intents/Intents.h>
@@ -163,13 +165,16 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     NSIndexPath* _currentlyFocusedIndexPath;
     UIImage* _loadingImage;
     NSCache* _system_description;
+    UISegmentedControl* _attractSegment;    // iOS: momentary one-segment button
+    UIBarButtonItem* _attractItem;          // the nav bar item wrapping it
+    CGFloat _attractSymbolSize;             // point size for the on/off symbol
 }
 @end
 
 @implementation ChooseGameController
 
 + (NSArray<NSString*>*) allSettingsKeys {
-    return @[LAYOUT_MODE_KEY, SCOPE_MODE_KEY, RECENT_GAMES_KEY, FAVORITE_GAMES_KEY, COLLAPSED_STATE_KEY, SELECTED_GAME_KEY, SELECTED_GAME_SECTION_KEY];
+    return @[LAYOUT_MODE_KEY, SCOPE_MODE_KEY, RECENT_GAMES_KEY, FAVORITE_GAMES_KEY, COLLAPSED_STATE_KEY, SELECTED_GAME_KEY, SELECTED_GAME_SECTION_KEY, ATTRACT_MODE_KEY];
 }
 
 - (instancetype)init
@@ -300,7 +305,10 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     UIBarButtonItem* addRoms = [[UIBarButtonItem alloc] initWithCustomView:seg4];
 #endif
     
-    self.navigationItem.rightBarButtonItems = @[addRoms, settings, layout, scope];
+    // attract mode - play a random arcade game when the user goes idle in here
+    UIBarButtonItem* attract = [self makeAttractModeButton:height];
+
+    self.navigationItem.rightBarButtonItems = @[addRoms, settings, attract, layout, scope];
 
 #if TARGET_OS_IOS
     if (@available(iOS 13.0, *)) {
@@ -345,6 +353,9 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     }
 #endif
     
+    // watch for any touch so Attract Mode knows the user is still here
+    [self.view addGestureRecognizer:[[AttractIdleGestureRecognizer alloc] init]];
+
     // attach long press gesture to collectionView (only on pre-iOS 13, and tvOS)
     if (NSClassFromString(@"UIContextMenuConfiguration") == nil) {
         [self.collectionView addGestureRecognizer:[[UILongPressGestureRecognizer alloc] initWithTarget:self action:@selector(handleLongPress:)]];
@@ -393,6 +404,65 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 #endif
 }
 
+#pragma mark - attract mode
+
+// a momentary button whose icon fills in while Attract Mode is armed.
+// NOTE momentary matters - a *selected* segment does not send valueChanged when you
+// tap it again, which would leave no way to turn Attract Mode back off.
+- (UIBarButtonItem*)makeAttractModeButton:(CGFloat)pointSize
+{
+    _attractSymbolSize = pointSize;
+
+#if TARGET_OS_TV
+    _attractItem = [[UIBarButtonItem alloc] initWithImage:nil style:UIBarButtonItemStylePlain target:self action:@selector(attractModeChange:)];
+#else
+    _attractSegment = [[UISegmentedControl alloc] initWithItems:@[@""]];
+    _attractSegment.momentary = YES;
+    [_attractSegment addTarget:self action:@selector(attractModeChange:) forControlEvents:UIControlEventValueChanged];
+    _attractItem = [[UIBarButtonItem alloc] initWithCustomView:_attractSegment];
+#endif
+
+    [self updateAttractModeButton];
+    return _attractItem;
+}
+
+- (void)updateAttractModeButton
+{
+    BOOL on = [AttractMode.shared isEnabled];
+
+    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:_attractSymbolSize];
+    UIImage* image = [UIImage systemImageNamed:(on ? @"play.rectangle.fill" : @"play.rectangle") withConfiguration:config];
+    NSString* label = on ? NSLocalizedString(@"Attract Mode On", @"Attract Mode toggle, on") :
+                           NSLocalizedString(@"Attract Mode Off", @"Attract Mode toggle, off");
+
+#if TARGET_OS_TV
+    _attractItem.image = image;
+    _attractItem.accessibilityLabel = label;
+#else
+    if (image != nil)
+        [_attractSegment setImage:image forSegmentAtIndex:0];
+    else
+        [_attractSegment setTitle:(on ? @"▶" : @"▷") forSegmentAtIndex:0];
+    _attractSegment.accessibilityLabel = label;
+#endif
+}
+
+- (void)attractModeChange:(id)sender
+{
+    BOOL on = ![AttractMode.shared isEnabled];
+    NSLog(@"ATTRACT MODE: %@", on ? @"ON" : @"OFF");
+
+    AttractMode.shared.enabled = on;
+    [self updateAttractModeButton];
+
+    // turning it on starts a game right away, so there is no time for a toast
+    if (!on)
+        [self.view makeToast:NSLocalizedString(@"Attract Mode off", @"Attract Mode disabled toast")
+                    duration:2.0 position:CSToastPositionBottom];
+}
+
+#pragma mark -
+
 -(void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
@@ -401,14 +471,21 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 {
     [super viewDidAppear:animated];
     [self restoreSelection];
-    
+
     // hide the search bar if we are at the top
     if (self.collectionView.contentOffset.y <= 0.0)
         [self scrollToTop];
+
+    // start the idle countdown, but not for the tvOS search results controller
+    if (!_isSearchResults)
+        [AttractMode.shared browserDidAppear];
 }
 - (void)viewWillDisappear:(BOOL)animated {
     [super viewWillDisappear:animated];
     [self saveSelection];
+
+    if (!_isSearchResults)
+        [AttractMode.shared browserWillDisappear];
 }
 - (void)viewDidDisappear:(BOOL)animated {
     [super viewDidDisappear:animated];
@@ -548,6 +625,10 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     
     _gameList = [games copy];
     [self filterGameList];
+
+    // Attract Mode picks its games out of the same list the user is browsing
+    if (!_isSearchResults)
+        [AttractMode.shared setGameList:_gameList];
 }
 
 - (void)reload
@@ -1012,6 +1093,8 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 }
 
 - (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    [AttractMode.shared noteUserActivity];
+
     CGFloat yTop = scrollView.contentOffset.y + scrollView.adjustedContentInset.top;
     for (GameInfoCell* cell in [self.collectionView visibleSupplementaryViewsOfKind:UICollectionElementKindSectionHeader]) {
         if (yTop > 0.5 && fabs(yTop - cell.frame.origin.y) <= cell.frame.size.height) {
@@ -1059,11 +1142,11 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     NSArray* recentGames = [NSUserDefaults.standardUserDefaults objectForKey:RECENT_GAMES_KEY] ?: @[];
     return [recentGames containsObject:game.gameDictionary];
 }
-- (void)setRecent:(GameInfo*)game isRecent:(BOOL)flag
++ (void)setRecent:(GameInfo*)game isRecent:(BOOL)flag
 {
     if (game == nil || game.gameName.length == 0)
         return;
-    
+
     NSMutableArray* recentGames = [([NSUserDefaults.standardUserDefaults objectForKey:RECENT_GAMES_KEY] ?: @[]) mutableCopy];
 
     [recentGames removeObject:game.gameDictionary];
@@ -1073,6 +1156,17 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         [recentGames removeObjectsInRange:NSMakeRange(RECENT_GAMES_MAX,[recentGames count] - RECENT_GAMES_MAX)];
 
     [NSUserDefaults.standardUserDefaults setObject:recentGames forKey:RECENT_GAMES_KEY];
+}
+
+// used by Attract Mode when the user decides to keep the game they are watching
++ (void)addRecentGame:(GameInfo*)game
+{
+    [self setRecent:game isRecent:TRUE];
+}
+
+- (void)setRecent:(GameInfo*)game isRecent:(BOOL)flag
+{
+    [ChooseGameController setRecent:game isRecent:flag];
     [self updateExternal];
 }
 
@@ -2341,6 +2435,8 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
 // check for input related to moving and selecting.
 -(void)handleButtonPress:(ButtonPressType)type
 {
+    [AttractMode.shared noteUserActivity];
+
     switch (type) {
         case ButtonPressTypeUp:
             return [self onCommandMove:-1 * _layoutCollums];

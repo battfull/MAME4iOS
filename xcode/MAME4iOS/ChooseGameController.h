@@ -28,6 +28,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) UIImage* backgroundImage;
 @property(nonatomic, assign) BOOL hideConsoles;
 
+// add a game to the Recently Played list (used by Attract Mode)
++ (void)addRecentGame:(GameInfo*)game;
+
 +(NSAttributedString*)getGameText:(GameInfo*)game;
 +(UIImage*)getGameIcon:(GameInfo*)game;
 

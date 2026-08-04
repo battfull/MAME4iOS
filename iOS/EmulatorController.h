@@ -138,6 +138,7 @@ extern NSArray* g_import_file_types;
 - (void)runMenu;
 - (void)runMenu:(id)sender;
 - (void)runExit;
+- (void)runExit:(BOOL)ask;
 - (void)runServer;
 - (void)runReset;
 - (void)runBenchmark;

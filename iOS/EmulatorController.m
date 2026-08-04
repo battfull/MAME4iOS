@@ -63,6 +63,7 @@
 
 #import "ChooseGameController.h"
 #import "GameInfo.h"
+#import "AttractMode.h"
 
 #if TARGET_OS_TV
 #import "TVOptionsController.h"
@@ -448,7 +449,8 @@ int run_mame(char* system, char* type, char* game, char* options)
     ARG(g_pref_cheat ? "-cheat" : "-nocheat");
     
     ARG(g_pref_autosave ? "-autosave" : "-noautosave"); // TODO: this is not connected to any UI
-    ARG(g_pref_showINFO ? "-noskip_gameinfo" : "-skip_gameinfo");
+    // Attract Mode always skips the game info/warning screen, nobody is there to dismiss it
+    ARG((g_pref_showINFO && !g_attract_mode) ? "-noskip_gameinfo" : "-skip_gameinfo");
     
     ARG2("-speed", speed);
         
@@ -718,13 +720,19 @@ void m4i_game_list(myosd_game_info* game_info, int game_count)
         
         NSMutableArray* games = [[NSMutableArray alloc] init];
         Options *options = [[Options alloc] init];
-        
+
+        // MYOSD_GAME_INFO_NOT_WORKING does not survive into GameInfo, so remember the
+        // names here for Attract Mode, which must never show a game that errors out.
+        NSMutableSet* not_working = [[NSMutableSet alloc] init];
+
         for (int i=0; i<game_count; i++)
         {
             if (game_info[i].name == NULL || game_info[i].name[0] == 0)
                 continue;
             if (game_info[i].type < 0 || game_info[i].type >= sizeof(types)/sizeof(types[0]))
                 continue;
+            if (game_info[i].flags & MYOSD_GAME_INFO_NOT_WORKING)
+                [not_working addObject:@(game_info[i].name)];
             if (g_pref_filter_bios && (game_info[i].flags & MYOSD_GAME_INFO_BIOS) && myosd_get(MYOSD_VERSION) == 139)
                 continue;
             if (g_pref_filter_not_working && (game_info[i].flags & MYOSD_GAME_INFO_NOT_WORKING))
@@ -840,6 +848,9 @@ void m4i_game_list(myosd_game_info* game_info, int game_count)
 #endif
 
       // give the list to the main thread to display to user
+      dispatch_async(dispatch_get_main_queue(), ^{
+          [AttractMode.shared setNotWorkingGameNames:not_working];
+      });
       [sharedInstance performSelectorOnMainThread:@selector(chooseGame:) withObject:games waitUntilDone:FALSE];
     }
 }
@@ -850,7 +861,19 @@ void m4i_game_start(myosd_game_info* info)
     NSLog(@"GAME START: %s \"%s\"%s%s %.3fsec", info->name, info->description,
           (info->flags & MYOSD_GAME_INFO_VERTICAL) ? " VERTICAL" : "",
           (info->flags & MYOSD_GAME_INFO_VECTOR) ? " VECTOR" : "", TIMER_TIME(mame_boot));
-    
+
+    // Attract Mode: a machine MAME says is broken makes a lousy demo, and puts up the
+    // red warning screen. bail rather than staring at it for 30 seconds. this catches
+    // games the list filter missed, either because the user is not filtering them out
+    // or because a game came in from a snapshot/URL.
+    if (g_attract_mode) {
+        BOOL broken = (info->flags & MYOSD_GAME_INFO_NOT_WORKING) != 0;
+        NSString* name = @(info->name);
+        dispatch_async(dispatch_get_main_queue(), ^{
+            [AttractMode.shared attractGameDidStart:name broken:broken];
+        });
+    }
+
     myosd_inGame = 1;
     myosd_isVertical = (info->flags & MYOSD_GAME_INFO_VERTICAL) != 0;
     myosd_isVector = (info->flags & MYOSD_GAME_INFO_VECTOR) != 0;
@@ -2276,7 +2299,8 @@ static NSMutableArray* split(NSString* str, NSString* sep) {
     myosd_set(MYOSD_FPS, showFPS);
     [(MetalView*)screenView setShowFPS:showFPS];
 
-    if (g_pref_showHUD == HudSizeZero) {
+    // no HUD in Attract Mode, the overlay owns the screen
+    if (g_pref_showHUD == HudSizeZero || g_attract_mode) {
         [self saveHUD];
         if (hudViewController != nil) {
             [hudViewController.view removeFromSuperview];
@@ -2606,7 +2630,7 @@ static NSMutableArray* split(NSString* str, NSString* sep) {
 #endif
 
     // Show a WARNING toast, but only once, and only if MAME did not show it already
-    if (g_pref_showINFO == 0 && g_mame_warning_shown == 0 && g_mame_output_text[0] && strstr(g_mame_output_text, "WARNING") != NULL) {
+    if (g_pref_showINFO == 0 && g_mame_warning_shown == 0 && g_attract_mode == 0 && g_mame_output_text[0] && strstr(g_mame_output_text, "WARNING") != NULL) {
         [self.view makeToast:NSLocalizedString(@"⚠️Game might not run correctly.",@"") duration:3.0 position:CSToastPositionBottom style:toastStyle];
         g_mame_warning_shown = 1;
     }
@@ -2616,6 +2640,9 @@ static NSMutableArray* split(NSString* str, NSString* sep) {
     
     areControlsHidden = NO;
     memset(cyclesAfterButtonPressed, 0, sizeof(cyclesAfterButtonPressed));
+
+    // we just rebuilt the view hierarchy, keep the Attract Mode overlay on top of it
+    [AttractMode.shared didChangeUI];
 }}
 
 #pragma mark - mame device input
@@ -3073,8 +3100,15 @@ static void handle_p1aspx(myosd_input_state* myosd) {
 
 // called from inside MAME for a reset of the input system
 void m4i_input_init(myosd_input_state* myosd, size_t input_size) {
-    
+
     push_mame_flush();
+
+    // Attract Mode: nobody is here to press a key, so clear MAME's startup screens
+    // ourselves. modern MAME shows the warnings screen even with -skip_gameinfo, and
+    // for a broken machine it wants you to literally type "OK" to continue.
+    // NOTE this has to come after the flush above, which would eat the keys.
+    if (g_attract_mode)
+        push_mame_keys(MYOSD_KEY_O, MYOSD_KEY_K, MYOSD_KEY_ENTER, MYOSD_KEY_ENTER);
 
     // get the input profile for this machine (copy into globals)
     myosd_num_buttons   = myosd->num_buttons;
@@ -3200,7 +3234,11 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     
     inputView = [[UIView alloc] initWithFrame:self.view.bounds];
     [self.view addSubview:inputView];
-    
+
+    // no touch controls in Attract Mode, a tap means "let me browse", not "fire"
+    if (g_attract_mode)
+        return;
+
     // no touch controlls for fullscreen with a joystick
     if (g_joy_used == JOY_USED_GAMEPAD && g_device_is_fullscreen)
         return;
@@ -5322,6 +5360,15 @@ static unsigned long g_device_has_input[NUM_DEV];   // TRUE if device needs to b
             int index = (int)[g_controllers indexOfObjectIdenticalTo:gamepad.controller];
             if (index >= 0 && index < NUM_DEV)
                 g_device_has_input[index] = 1;
+
+            // Attract Mode: Ⓐ keeps the game, any other input goes back to browsing
+            if (g_attract_mode) {
+                unsigned long status = read_remote(gamepad, NULL);
+                if (status & MYOSD_A)
+                    [AttractMode.shared keepPlaying];
+                else if (status != 0)
+                    [AttractMode.shared stop];
+            }
         };
         return;
     }
@@ -5343,6 +5390,19 @@ static unsigned long g_device_has_input[NUM_DEV];   // TRUE if device needs to b
             return;
 
         g_device_has_input[index] = 1;
+
+        // Attract Mode: Ⓐ keeps the game the user is watching, Ⓧ jumps to another game,
+        // any other button goes back to browsing. dont let input reach MAME either way.
+        if (g_attract_mode) {
+            unsigned long status = read_gamepad(gamepad, NULL);
+            if (status & MYOSD_A)
+                [AttractMode.shared keepPlaying];
+            else if (status & MYOSD_X)
+                [AttractMode.shared skipToNextGame];
+            else if (status != 0)
+                [AttractMode.shared stop];
+            return;
+        }
 
         // if a MENU button is down (or menuHUD) handle a menu button combo
         if (g_menuButtonMode[index] != 0 || g_menu != nil)
@@ -6061,6 +6121,15 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
 #pragma mark choose game UI
 
 -(void)chooseGame:(NSArray*)games {
+    // Attract Mode is driving - the game either errored out or ended on its own.
+    // dont bring up any UI, just quietly move on to the next game.
+    if (g_attract_mode) {
+        NSLog(@"ATTRACT: GAME ENDED (%s)", g_mame_game_error);
+        g_mame_game_error[0] = 0;
+        [AttractMode.shared attractGameDidEnd];
+        return;
+    }
+
     // if we are running a benchmark, end it
     if (g_mame_benchmark) {
         [self endBenchmark];
@@ -6192,6 +6261,20 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
 
 - (void)pressesBegan:(NSSet<UIPress *> *)presses withEvent:(UIPressesEvent *)event {
     NSLog(@"PRESSES BEGAN: %ld", presses.allObjects.firstObject.type);
+
+    // Attract Mode: SELECT keeps the game the user is watching, PLAY/PAUSE jumps to
+    // another game, anything else goes back to browsing
+    if (g_attract_mode && presses.count != 0) {
+        UIPressType type = presses.allObjects.firstObject.type;
+        if (type == UIPressTypeSelect)
+            [AttractMode.shared keepPlaying];
+        else if (type == UIPressTypePlayPause)
+            [AttractMode.shared skipToNextGame];
+        else
+            [AttractMode.shared stop];
+        return;
+    }
+
     for (UIPress *press in presses) {
         UIPressType type = press.type;
 
