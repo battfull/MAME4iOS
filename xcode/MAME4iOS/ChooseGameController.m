@@ -1179,12 +1179,12 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 
 #pragma mark Favorites
 
-- (BOOL)isFavorite:(GameInfo*)game
++ (BOOL)isFavorite:(GameInfo*)game
 {
     NSArray* favoriteGames = [NSUserDefaults.standardUserDefaults objectForKey:FAVORITE_GAMES_KEY] ?: @[];
     return [favoriteGames containsObject:game.gameDictionary];
 }
-- (void)setFavorite:(GameInfo*)game isFavorite:(BOOL)flag
++ (void)setFavorite:(GameInfo*)game isFavorite:(BOOL)flag
 {
     if (game == nil || game.gameName.length == 0)
         return;
@@ -1195,8 +1195,17 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 
     if (flag)
         [favoriteGames insertObject:game.gameDictionary atIndex:0];
-    
+
     [NSUserDefaults.standardUserDefaults setObject:favoriteGames forKey:FAVORITE_GAMES_KEY];
+}
+
+- (BOOL)isFavorite:(GameInfo*)game
+{
+    return [ChooseGameController isFavorite:game];
+}
+- (void)setFavorite:(GameInfo*)game isFavorite:(BOOL)flag
+{
+    [ChooseGameController setFavorite:game isFavorite:flag];
     [self updateExternal];
 }
 

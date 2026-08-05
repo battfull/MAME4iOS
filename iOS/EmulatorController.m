@@ -1458,7 +1458,8 @@ UIViewController* g_menu;
 - (void)enterBackground
 {
     // this is called from bootstrapper when app is going into the background, save the current game we are playing so we can restore next time.
-    [EmulatorController setCurrentGame:g_mame_game_info];
+    // NOTE an Attract Mode game is ours, not the user's - dont resume into it next launch
+    [EmulatorController setCurrentGame:g_attract_mode ? nil : g_mame_game_info];
     
     // also save the position of the HUD
     [self saveHUD];
@@ -1470,10 +1471,19 @@ UIViewController* g_menu;
     // PAUSE (by calling startMenu) the mame thread when we go into the background. but not on macOS
     if (!IsRunningOnMac() && self.presentedViewController == nil && g_emulation_paused == PAUSE_FALSE)
         [self startMenu];
+
+    // NOTE the check above never fires for an Attract Mode preview - the ROM browser is
+    // presented over us the whole time it plays. this also stops its game timer and
+    // countdown bar, which would otherwise run down while we were suspended.
+    [AttractMode.shared appDidEnterBackground];
 }
 
 - (void)enterForeground {
-    
+
+    // first, so emulation is already running again and the check below finds
+    // PAUSE_FALSE rather than unpausing a preview behind Attract Mode's back
+    [AttractMode.shared appWillEnterForeground];
+
     // RESUME (by calling endMenu) the mame thread when we go into the background.
     if (self.presentedViewController == nil && g_emulation_paused == PAUSE_THREAD)
         [self endMenu];
@@ -6401,6 +6411,11 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
 
 -(void)updateUserActivity:(GameInfo*)game
 {
+    // Attract Mode is showing the game, the user did not choose it. it does not belong
+    // in Handoff, Siri suggestions or the window title.
+    if (g_attract_mode)
+        return;
+
 #if TARGET_OS_IOS
     if (game != nil)
         self.userActivity = [ChooseGameController userActivityForGame:game];

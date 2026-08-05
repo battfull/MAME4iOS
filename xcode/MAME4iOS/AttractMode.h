@@ -24,8 +24,11 @@ void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 // "Attract Mode" section. `screenContainer` is what the emulator renders into.
 @interface AttractModeCell : UICollectionViewCell
 @property (nonatomic, readonly) UIView* screenContainer;
+
+// what is playing, so the favorite heart can show and toggle its state
+@property (nonatomic, strong, nullable) GameInfo* game;
 - (void)setGameTitle:(nullable NSString*)title detail:(nullable NSString*)detail;
-- (void)startProgress:(NSTimeInterval)duration;
+- (void)startProgress:(NSTimeInterval)remaining of:(NSTimeInterval)total;
 - (void)updatePinButton;
 @end
 
@@ -85,6 +88,10 @@ void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 // ROM browser lifecycle - the idle countdown only runs while the browser is up
 - (void)browserDidAppear;
 - (void)browserWillDisappear;
+
+// app lifecycle - freezes the game, its clock and the countdown bar together
+- (void)appDidEnterBackground;
+- (void)appWillEnterForeground;
 
 // any user input at all - ends a full screen takeover, leaves the inline preview be
 - (void)noteUserActivity;

@@ -2062,6 +2062,9 @@
         }
       }
     },
+    "Next Game" : {
+      "comment" : "Attract Mode next game button"
+    },
     "Nintendo Button Layout" : {
       "localizations" : {
         "ja" : {

@@ -78,7 +78,7 @@ void AttractLog(NSString* format, ...)
 @property (nonatomic, strong) UILabel* detailLabel;
 @property (nonatomic, strong) UIButton* playButton;
 @property (nonatomic, strong) UIButton* nextButton;
-- (void)startProgress:(NSTimeInterval)duration;
+- (void)startProgress:(NSTimeInterval)remaining of:(NSTimeInterval)total;
 @end
 
 @implementation AttractModeOverlayView
@@ -250,16 +250,18 @@ void AttractLog(NSString* format, ...)
     return box;
 }
 
-// run the countdown line from empty to full over this game's turn
-- (void)startProgress:(NSTimeInterval)duration
+// drain the countdown line from full to empty over this game's turn, so what is left
+// on screen is the time remaining. picking up mid game (resumed, or expanded from the
+// preview) starts part way along rather than jumping back to full.
+- (void)startProgress:(NSTimeInterval)remaining of:(NSTimeInterval)total
 {
     [_progressFill.layer removeAllAnimations];
 
-    _progressWidth.constant = 0.0;
+    _progressWidth.constant = self.bounds.size.width * (total > 0.0 ? MIN(remaining / total, 1.0) : 1.0);
     [self layoutIfNeeded];
 
-    _progressWidth.constant = self.bounds.size.width;
-    [UIView animateWithDuration:duration delay:0.0
+    _progressWidth.constant = 0.0;
+    [UIView animateWithDuration:remaining delay:0.0
                         options:UIViewAnimationOptionCurveLinear | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{ [self layoutIfNeeded]; }
                      completion:nil];
@@ -293,6 +295,7 @@ void AttractLog(NSString* format, ...)
 @implementation AttractModeCell
 {
     UIButton* _pinButton;
+    UIButton* _favoriteButton;
     CGSize _lastScreenSize;
     UILabel* _titleLabel;
     UILabel* _detailLabel;
@@ -343,15 +346,30 @@ void AttractLog(NSString* format, ...)
     text.axis = UILayoutConstraintAxisVertical;
     text.alignment = UIStackViewAlignmentLeading;
 
-    UIButton* next = [self makeButton:NSLocalizedString(@"⏭ Next", @"Attract Mode next game button")
-                               symbol:nil action:@selector(nextTapped)];
     _pinButton = [self makeButton:nil symbol:@"pin" action:@selector(pinTapped)];
-    UIButton* expand = [self makeButton:nil symbol:@"arrow.up.left.and.arrow.down.right" action:@selector(expandTapped)];
-
     _pinButton.accessibilityLabel = NSLocalizedString(@"Pin Attract Mode", @"Attract Mode pin button");
-    expand.accessibilityLabel = NSLocalizedString(@"Full Screen", @"Attract Mode expand button");
 
-    UIStackView* row = [[UIStackView alloc] initWithArrangedSubviews:@[text, next, _pinButton, expand]];
+    // full screen sits over the picture in the top right, the way a video player does.
+    // NOTE it goes in contentView rather than inside screenContainer - buildScreenView
+    // brings the emulator's screen view to the front of its superview every time, so
+    // anything parented inside the container gets buried.
+    UIButton* expand = [self makeOverlayButton:@"arrow.up.left.and.arrow.down.right" action:@selector(expandTapped)];
+    expand.accessibilityLabel = NSLocalizedString(@"Full Screen", @"Attract Mode expand button");
+    expand.translatesAutoresizingMaskIntoConstraints = NO;
+
+    _favoriteButton = [self makeOverlayButton:@"heart" action:@selector(favoriteTapped)];
+    _favoriteButton.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // skip to the next game, bottom right over the picture
+    UIButton* next = [self makeOverlayButton:@"forward.end.fill" action:@selector(nextTapped)];
+    next.accessibilityLabel = NSLocalizedString(@"Next Game", @"Attract Mode next game button");
+    next.translatesAutoresizingMaskIntoConstraints = NO;
+
+    [self.contentView addSubview:_favoriteButton];
+    [self.contentView addSubview:expand];
+    [self.contentView addSubview:next];
+
+    UIStackView* row = [[UIStackView alloc] initWithArrangedSubviews:@[text, _pinButton]];
     row.axis = UILayoutConstraintAxisHorizontal;
     row.alignment = UIStackViewAlignmentCenter;
     row.spacing = 8.0;
@@ -380,6 +398,15 @@ void AttractLog(NSString* format, ...)
         [row.trailingAnchor constraintEqualToAnchor:content.trailingAnchor constant:-4.0],
         [row.topAnchor constraintEqualToAnchor:_progressTrack.bottomAnchor constant:6.0],
         [row.bottomAnchor constraintEqualToAnchor:content.bottomAnchor constant:-4.0],
+
+        [_favoriteButton.topAnchor constraintEqualToAnchor:_screenContainer.topAnchor constant:4.0],
+        [_favoriteButton.leadingAnchor constraintEqualToAnchor:_screenContainer.leadingAnchor constant:4.0],
+
+        [expand.topAnchor constraintEqualToAnchor:_screenContainer.topAnchor constant:4.0],
+        [expand.trailingAnchor constraintEqualToAnchor:_screenContainer.trailingAnchor constant:-4.0],
+
+        [next.bottomAnchor constraintEqualToAnchor:_screenContainer.bottomAnchor constant:-4.0],
+        [next.trailingAnchor constraintEqualToAnchor:_screenContainer.trailingAnchor constant:-4.0],
     ]];
 
     [self updatePinButton];
@@ -387,12 +414,29 @@ void AttractLog(NSString* format, ...)
     return self;
 }
 
+// borderless, sits over the picture the way a video player's controls do. no pill,
+// just a drop shadow so it stays readable over a bright game.
+- (UIButton*)makeOverlayButton:(NSString*)symbol action:(SEL)action
+{
+    UIButton* button = [self makeButton:nil symbol:symbol action:action];
+
+    button.backgroundColor = UIColor.clearColor;
+    button.layer.cornerRadius = 0.0;
+    button.layer.masksToBounds = NO;
+    button.layer.shadowColor = UIColor.blackColor.CGColor;
+    button.layer.shadowOpacity = 0.8;
+    button.layer.shadowRadius = 3.0;
+    button.layer.shadowOffset = CGSizeZero;
+
+    return button;
+}
+
 - (UIButton*)makeButton:(NSString*)title symbol:(NSString*)symbol action:(SEL)action
 {
     UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
 
     if (symbol != nil) {
-        UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:TARGET_OS_IOS ? 15.0 : 22.0];
+        UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:TARGET_OS_IOS ? 16.0 : 24.0];
         [button setImage:[UIImage systemImageNamed:symbol withConfiguration:config] forState:UIControlStateNormal];
         button.tintColor = UIColor.whiteColor;
     }
@@ -419,15 +463,43 @@ void AttractLog(NSString* format, ...)
     [self updatePinButton];
 }
 
-- (void)startProgress:(NSTimeInterval)duration
+- (void)setGame:(GameInfo*)game
+{
+    _game = game;
+    [self updateFavoriteButton];
+}
+
+// filled heart means "this is a favorite, tap to remove"
+- (void)updateFavoriteButton
+{
+    BOOL favorite = _game != nil && [ChooseGameController isFavorite:_game];
+    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:TARGET_OS_IOS ? 16.0 : 24.0];
+
+    [_favoriteButton setImage:[UIImage systemImageNamed:(favorite ? @"heart.fill" : @"heart") withConfiguration:config] forState:UIControlStateNormal];
+    _favoriteButton.tintColor = favorite ? UIColor.systemRedColor : UIColor.whiteColor;
+    _favoriteButton.hidden = (_game == nil);
+    _favoriteButton.accessibilityLabel = favorite ? NSLocalizedString(@"Remove from Favorites", @"")
+                                                  : NSLocalizedString(@"Add to Favorites", @"");
+}
+
+- (void)favoriteTapped
+{
+    if (_game == nil)
+        return;
+
+    [ChooseGameController setFavorite:_game isFavorite:![ChooseGameController isFavorite:_game]];
+    [self updateFavoriteButton];
+}
+
+- (void)startProgress:(NSTimeInterval)remaining of:(NSTimeInterval)total
 {
     [_progressFill.layer removeAllAnimations];
 
-    _progressWidth.constant = 0.0;
+    _progressWidth.constant = _progressTrack.bounds.size.width * (total > 0.0 ? MIN(remaining / total, 1.0) : 1.0);
     [self layoutIfNeeded];
 
-    _progressWidth.constant = _progressTrack.bounds.size.width;
-    [UIView animateWithDuration:duration delay:0.0
+    _progressWidth.constant = 0.0;
+    [UIView animateWithDuration:remaining delay:0.0
                         options:UIViewAnimationOptionCurveLinear | UIViewAnimationOptionBeginFromCurrentState
                      animations:^{ [self layoutIfNeeded]; }
                      completion:nil];
@@ -977,13 +1049,25 @@ void AttractLog(NSString* format, ...)
     [self pausePreview];
 }
 
+// the app is going away. the game timer and the progress bar both keep counting
+// across a suspend otherwise, so the turn would be over (or nearly) on return.
+- (void)appDidEnterBackground
+{
+    [self pausePreview];
+}
+
+- (void)appWillEnterForeground
+{
+    [self resumePreview];
+}
+
 // scrolled out of view - freeze the game and its clock rather than throwing it away,
 // so scrolling back picks up exactly where it left off with no reload.
 // NOTE embeddedView is deliberately left pointing at the cell. it is not being drawn
 // while paused, and -attachInlineCell: sets it again when the cell comes back.
 - (void)pausePreview
 {
-    if (!_running || _paused || _fullScreen)
+    if (!_running || _paused)
         return;
 
     _paused = YES;
@@ -1036,6 +1120,8 @@ void AttractLog(NSString* format, ...)
 
     if (_fullScreen)
         [self showOverlayForGame:game];
+    else
+        [self updateChromeForGame:game duration:self.gameDuration];
 
     [self playGame:game];
 }
@@ -1300,8 +1386,9 @@ void AttractLog(NSString* format, ...)
     NSString* detail = [parts componentsJoinedByString:@" · "];
 
     if (_inlineCell != nil) {
+        _inlineCell.game = game;
         [_inlineCell setGameTitle:title detail:detail];
-        [_inlineCell startProgress:duration];
+        [_inlineCell startProgress:duration of:self.gameDuration];
     }
 
     if (_overlay != nil)
@@ -1319,7 +1406,7 @@ void AttractLog(NSString* format, ...)
         [parts addObject:game.gameManufacturer];
     _overlay.detailLabel.text = [parts componentsJoinedByString:@" · "];
 
-    [_overlay startProgress:duration];
+    [_overlay startProgress:duration of:self.gameDuration];
 
     // come back to full strength for the new game, then fade back out of the way
     [_dimTimer invalidate];

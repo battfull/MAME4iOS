@@ -31,6 +31,10 @@ NS_ASSUME_NONNULL_BEGIN
 // add a game to the Recently Played list (used by Attract Mode)
 + (void)addRecentGame:(GameInfo*)game;
 
+// favorites, so Attract Mode can show and toggle the state of what it is playing
++ (BOOL)isFavorite:(GameInfo*)game;
++ (void)setFavorite:(GameInfo*)game isFavorite:(BOOL)flag;
+
 // add or remove the Attract Mode preview section to match the Settings switch
 - (void)reloadAttractSection;
 
