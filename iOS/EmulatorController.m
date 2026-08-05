@@ -295,6 +295,7 @@ static char g_mame_options[1024];           // extra options to pass to MAME
 static char g_mame_game_error[64+256];      // name of the system/game that got an error.
 static char g_mame_output_text[4096];       // any ERROR, WARNING, or INFO text output while running game
 static BOOL g_mame_warning_shown = FALSE;
+static BOOL g_attract_dismiss_keys = FALSE; // TRUE when Attract Mode is booting a real game, see m4i_input_init
 static BOOL g_mame_benchmark = FALSE;       // if TRUE run game in benchmark mode (-bench 90)
 static BOOL g_mame_first_boot = FALSE;      // TRUE the first time MAME runs
 static BOOL g_no_roms_found = FALSE;
@@ -564,6 +565,9 @@ void set_mame_globals(GameInfo* game)
         strncpy(g_mame_type, game.gameMediaType.UTF8String, sizeof(g_mame_type));
         strncpy(g_mame_options, game.gameCustomCmdline.UTF8String, sizeof(g_mame_options));
         g_mame_game_error[0] = 0;
+
+        if (g_attract_mode)
+            AttractLog(@"SET GLOBALS game='%s' system='%s' type='%s'", g_mame_game, g_mame_system, g_mame_type);
     }
     else
     {
@@ -614,6 +618,16 @@ void* app_Thread_Start(void* args)
         if (running_game)
             g_mame_output_text[0] = 0;
         
+        // this is the authoritative "what is MAME actually being asked to run" - if
+        // this stops changing, the emulator is not being restarted between games.
+        if (g_attract_mode)
+            AttractLog(@"RUN MAME game='%s' system='%s' type='%s'", mame_game, mame_system, mame_type);
+
+        // only auto-dismiss startup screens when we are booting an actual game. with no
+        // game MAME sits in the select-game menu, where ENTER is UI_SELECT and would
+        // launch whatever machine happens to be under the cursor.
+        g_attract_dismiss_keys = g_attract_mode && running_game;
+
         if (run_mame(mame_system, mame_type, mame_game, mame_options) != 0 && running_game) {
             if (mame_system[0] == 0)
                 strncpy(g_mame_game_error, mame_game, sizeof(g_mame_game_error));
@@ -869,6 +883,7 @@ void m4i_game_start(myosd_game_info* info)
     if (g_attract_mode) {
         BOOL broken = (info->flags & MYOSD_GAME_INFO_NOT_WORKING) != 0;
         NSString* name = @(info->name);
+        AttractLog(@"MAME STARTED '%s' (\"%s\")%s", info->name, info->description, broken ? " NOT_WORKING" : "");
         dispatch_async(dispatch_get_main_queue(), ^{
             [AttractMode.shared attractGameDidStart:name broken:broken];
         });
@@ -883,6 +898,8 @@ void m4i_game_start(myosd_game_info* info)
 void m4i_game_stop(void)
 {
     NSLog(@"GAME STOP");
+    if (g_attract_mode)
+        AttractLog(@"MAME STOPPED");
     myosd_inGame = 0;
     myosd_isVertical = NO;
     myosd_isVector = NO;
@@ -3104,11 +3121,18 @@ void m4i_input_init(myosd_input_state* myosd, size_t input_size) {
     push_mame_flush();
 
     // Attract Mode: nobody is here to press a key, so clear MAME's startup screens
-    // ourselves. modern MAME shows the warnings screen even with -skip_gameinfo, and
-    // for a broken machine it wants you to literally type "OK" to continue.
-    // NOTE this has to come after the flush above, which would eat the keys.
-    if (g_attract_mode)
-        push_mame_keys(MYOSD_KEY_O, MYOSD_KEY_K, MYOSD_KEY_ENTER, MYOSD_KEY_ENTER);
+    // ourselves - modern MAME shows the warnings screen even with -skip_gameinfo.
+    // handler_messagebox_anykey takes *any* key, so send the one with the least
+    // baggage: ENTER is UI_SELECT, and otherwise only P3 Button 3. do NOT send
+    // letter keys here - O is the coin Door Interlock, which clears the bookkeeping
+    // totals on Nintendo Vs. hardware, and K is P1 Right Stick Down.
+    // NOTE this has to come after the flush above, which would eat the keys, and it
+    // must only happen when booting a real game - this is called for the select-game
+    // menu too, where ENTER launches whatever machine is under the cursor.
+    if (g_attract_dismiss_keys) {
+        g_attract_dismiss_keys = FALSE;
+        push_mame_keys(MYOSD_KEY_ENTER, MYOSD_KEY_ENTER, 0, 0);
+    }
 
     // get the input profile for this machine (copy into globals)
     myosd_num_buttons   = myosd->num_buttons;
@@ -6224,7 +6248,14 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
     choose.selectGameCallback = ^(GameInfo* game) {
         if (self.presentedViewController.isBeingDismissed)
             return;
-        
+
+        // the user picked a game themselves, so stand down. NOTE Attract Mode routes
+        // its own launches through this same callback, so only do this when it is not
+        // the one asking.
+        if (!g_attract_mode)
+            [AttractMode.shared userDidStartGame];
+
+
         [self dismissViewControllerAnimated:YES completion:^{
             self->keyboardView.active = YES;    // let hardware keyboard grab firstResoonder
             self.showSoftwareKeyboard = NO;     // new game starts out with software keyboard hidden

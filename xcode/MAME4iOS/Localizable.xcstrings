@@ -786,6 +786,9 @@
         }
       }
     },
+    "Attract Mode" : {
+      "comment" : "Section header for Attract Mode settings"
+    },
     "Attract Mode off" : {
       "comment" : "Attract Mode disabled toast"
     },
@@ -1592,6 +1595,9 @@
           }
         }
       }
+    },
+    "Game Length" : {
+      "comment" : "Settings: Attract Mode Section: how long each game plays"
     },
     "Genre" : {
       "comment" : "Genre scope",

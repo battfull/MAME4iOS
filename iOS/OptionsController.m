@@ -287,6 +287,20 @@
             }
             break;   
         }
+       case kAttractSection:
+       {
+           switch (indexPath.row)
+           {
+               case 0:
+               {
+                   cell.textLabel.text = NSLocalizedString(@"Game Length", @"Settings: Attract Mode Section: how long each game plays");
+                   cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                   cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
+                   break;
+               }
+           }
+           break;
+       }
        case kFilterSection:
        {
            switch (indexPath.row)
@@ -454,6 +468,7 @@
       case kVideoSection: return NSLocalizedString(@"Video Options", @"Section header for video display settings");
       case kVectorSection: return NSLocalizedString(@"Vector Options", @"Section header for vector graphics settings");
       case kMiscSection: return NSLocalizedString(@"Options", @"Section header for miscellaneous settings");
+      case kAttractSection: return NSLocalizedString(@"Attract Mode", @"Section header for Attract Mode settings");
       case kFilterSection: return NSLocalizedString(@"Game Filter", @"Section header for game filtering options");
       case kOtherSection: return @""; // @"Other";
       case kImportSection: return NSLocalizedString(@"Import and Export", @"Section header for import and export functions");
@@ -482,6 +497,7 @@
           case kVideoSection: return 7;
           case kVectorSection: return 2;
           case kMiscSection: return 9;
+          case kAttractSection: return 1;
           case kFilterSection: return 3;
           case kImportSection: return 4;
 #if !TARGET_APPSTORE
@@ -497,7 +513,7 @@
           case kBenchmarkSection:
               return self.presentingViewController == self.emuController ? 1 : 0;
       }
-    return -1;
+    return 0;
 }
 
 - (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
@@ -557,6 +573,14 @@
             }
             if (row==7) {
                 ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"soundValue" list:Options.arraySoundValue title:cell.textLabel.text];
+                [[self navigationController] pushViewController:listController animated:YES];
+            }
+            break;
+        }
+        case kAttractSection:
+        {
+            if (row==0) {
+                ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
                 [[self navigationController] pushViewController:listController animated:YES];
             }
             break;

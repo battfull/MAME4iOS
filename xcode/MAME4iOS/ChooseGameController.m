@@ -267,12 +267,12 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     [seg2 addTarget:self action:@selector(scopeChange:) forControlEvents:UIControlEventValueChanged];
     UIBarButtonItem* scope = [[UIBarButtonItem alloc] initWithCustomView:seg2];
     
-    // on a small phone, make the group button/scope just show a icon
-    #pragma clang diagnostic push
-    #pragma clang diagnostic ignored "-Wdeprecated"
-    if (UIApplication.sharedApplication.keyWindow.bounds.size.width <= 375)
+    // on a phone, make the group button/scope just show a icon. spelling out the
+    // current scope ("Manufacturer") eats enough of the navbar that the settings and
+    // add-roms buttons get pushed into an overflow "..." menu. iPad and Mac have the
+    // room, so they keep the text.
+    if (self.traitCollection.horizontalSizeClass == UIUserInterfaceSizeClassCompact)
         [seg2 setImage:[UIImage systemImageNamed:@"list.dash" withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:height]] forSegmentAtIndex:UISegmentedControlNoSegment];
-    #pragma clang diagnostic pop
 
 #if TARGET_OS_TV
     #pragma clang diagnostic push
@@ -305,10 +305,14 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     UIBarButtonItem* addRoms = [[UIBarButtonItem alloc] initWithCustomView:seg4];
 #endif
     
-    // attract mode - play a random arcade game when the user goes idle in here
-    UIBarButtonItem* attract = [self makeAttractModeButton:height];
+    self.navigationItem.rightBarButtonItems = @[addRoms, settings, layout, scope];
 
-    self.navigationItem.rightBarButtonItems = @[addRoms, settings, attract, layout, scope];
+    // attract mode - play a random game when the user goes idle in here.
+    // NOTE this goes on the *left*, next to the logo. the right side is already full
+    // (add roms, settings, layout, scope) and a fifth item makes iOS collapse the
+    // overflow into a "..." menu, hiding the settings and add-roms buttons.
+    UIBarButtonItem* attract = [self makeAttractModeButton:height];
+    self.navigationItem.leftBarButtonItems = @[self.navigationItem.leftBarButtonItem, attract];
 
 #if TARGET_OS_IOS
     if (@available(iOS 13.0, *)) {

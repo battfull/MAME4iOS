@@ -18,6 +18,9 @@
 + (NSArray*)arrayEmuSpeed {
     return @[@"Default",@"50%",@"60%",@"70%",@"80%",@"85%",@"90%",@"95%",@"100%",@"105%",@"110%",@"115%",@"120%",@"130%",@"140%",@"150%"];
 }
++ (NSArray*)arrayAttractDuration {
+    return @[@"30 Seconds",@"1 Minute",@"2 Minutes",@"5 Minutes"];
+}
 + (NSArray*)arrayControlType {
     return @[@"Keyboard",@"iCade or compatible",@"iCP, Gametel",@"iMpulse"];
 }
@@ -176,6 +179,7 @@
         
         _useDRC = 0;
         _hideTestROMs = 0;
+        _attractDuration = 0;
     }
     else
     {
@@ -256,6 +260,8 @@
         _useDRC = [[optionsDict objectForKey:@"useDRC"] intValue];
       
         _hideTestROMs = [[optionsDict objectForKey:@"hideTestROMs"] intValue];
+
+        _attractDuration = [[optionsDict objectForKey:@"attractDuration"] intValue];
     }
     
 }
@@ -334,6 +340,7 @@
                                  
                              [NSString stringWithFormat:@"%d", _useDRC], @"useDRC",
                              [NSString stringWithFormat:@"%d", _hideTestROMs], @"hideTestROMs",
+                             [NSString stringWithFormat:@"%d", _attractDuration], @"attractDuration",
                              nil];
 }
 

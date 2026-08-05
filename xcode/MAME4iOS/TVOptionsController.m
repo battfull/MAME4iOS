@@ -39,7 +39,9 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if ( section == kFilterSection ) {
+    if ( section == kAttractSection ) {
+        return 1;
+    } else if ( section == kFilterSection ) {
         return 3;
     } else if ( section == kScreenSection ) {
         return 7;
@@ -73,6 +75,9 @@
     }
     if ( section == kMiscSection ) {
         return @"Options";
+    }
+    if ( section == kAttractSection ) {
+        return @"Attract Mode";
     }
     if ( section == kFilterSection ) {
         return @"ROM Options";
@@ -213,6 +218,12 @@
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.detailTextLabel.text = [Options.arraySoundValue localizedOptionAtIndex:op.soundValue];
         }
+    } else if ( indexPath.section == kAttractSection ) {
+        if ( indexPath.row == 0 ) {
+            cell.textLabel.text = @"Game Length";
+            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+            cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
+        }
     } else if ( indexPath.section == kInputSection ) {
         cell.textLabel.text = @"Game Input";
         cell.imageView.image = [self systemImageNamed:@"gamecontroller" withFont:font];
@@ -282,6 +293,11 @@
         }
         if ( indexPath.row == 7 ) {
             ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"soundValue" list:Options.arraySoundValue title:cell.textLabel.text];
+            [[self navigationController] pushViewController:listController animated:YES];
+        }
+    } else if ( indexPath.section == kAttractSection ) {
+        if ( indexPath.row == 0 ) {
+            ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
             [[self navigationController] pushViewController:listController animated:YES];
         }
     } else if ( indexPath.section == kInputSection ) {

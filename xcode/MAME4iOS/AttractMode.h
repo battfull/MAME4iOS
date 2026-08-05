@@ -2,8 +2,8 @@
 //  AttractMode.h
 //  MAME4iOS
 //
-//  Plays a random arcade game when the user goes idle in the ROM browser, like a
-//  real cabinet running its demo loop. Any input takes you back to browsing.
+//  Plays a random game when the user goes idle in the ROM browser, like a real
+//  cabinet running its demo loop. Any input takes you back to browsing.
 //
 
 #import <UIKit/UIKit.h>
@@ -17,6 +17,10 @@ extern int g_attract_mode;
 
 // NSUserDefaults key for the browser toggle
 #define ATTRACT_MODE_KEY    @"AttractMode"
+
+// always-on logging for Attract Mode. NOTE both EmulatorController.m and
+// ChooseGameController.m #define NSLog away, so plain NSLog is a no-op there.
+void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 
 @interface AttractMode : NSObject
 
@@ -41,6 +45,10 @@ extern int g_attract_mode;
 
 // any user input at all - restarts the idle countdown, or ends Attract Mode if running
 - (void)noteUserActivity;
+
+// the user launched a game themselves - turns Attract Mode off so it does not take
+// over again when they return to the browser
+- (void)userDidStartGame;
 
 // move on to another random game right now, without waiting out the timer
 - (void)skipToNextGame;

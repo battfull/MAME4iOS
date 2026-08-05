@@ -2,13 +2,14 @@
 //  AttractMode.m
 //  MAME4iOS
 //
-//  Plays a random arcade game when the user goes idle in the ROM browser, like a
-//  real cabinet running its demo loop. Any input takes you back to browsing.
+//  Plays a random game when the user goes idle in the ROM browser, like a real
+//  cabinet running its demo loop. Any input takes you back to browsing.
 //
 
 #import "AttractMode.h"
 #import "ChooseGameController.h"
 #import "EmulatorController.h"
+#import "Options.h"
 
 #if !__has_feature(objc_arc)
 #error("This file assumes ARC")
@@ -21,8 +22,6 @@
 
 // how long the user has to sit still in the ROM browser before we take over
 #define ATTRACT_IDLE_DELAY      10.0
-// how long each game gets before we move on to the next one
-#define ATTRACT_GAME_DURATION   30.0
 // how long the chrome stays at full strength before fading back to let the game show
 #define ATTRACT_DIM_DELAY       4.0
 #define ATTRACT_DIM_ALPHA       0.6
@@ -38,7 +37,20 @@
 #define OVERLAY_CORNER_RADIUS   14.0
 #define PROGRESS_HEIGHT         (TARGET_OS_IOS ? 3.0 : 6.0)
 
+// seconds per entry of Options.arrayAttractDuration - keep these in step
+static const NSTimeInterval kAttractDurations[] = { 30.0, 60.0, 120.0, 300.0 };
+
 int g_attract_mode = 0;
+
+// NOTE uses NSLogv, which is a real function and so survives the NSLog macro above
+// (and the identical one in EmulatorController.m / ChooseGameController.m)
+void AttractLog(NSString* format, ...)
+{
+    va_list args;
+    va_start(args, format);
+    NSLogv([@"ATTRACT: " stringByAppendingString:format], args);
+    va_end(args);
+}
 
 #pragma mark - overlay view
 
@@ -77,8 +89,8 @@ int g_attract_mode = 0;
     return self;
 }
 
-// a thin line across the very top counting down this game's 30 seconds. it lives
-// outside the chrome so it stays readable after everything else fades back.
+// a thin line across the very top counting down this game's turn. it lives outside
+// the chrome so it stays readable after everything else fades back.
 - (void)buildProgressBar
 {
     UIView* track = [[UIView alloc] init];
@@ -369,17 +381,37 @@ int g_attract_mode = 0;
     return NO;
 }
 
-// arcade games only, no consoles, computers, BIOS machines, software or snapshots,
-// no clones so we dont show five flavors of the same game in a row, and nothing that
-// is broken or is really a pinball table / slot machine.
+// anything that will actually put a picture on screen unattended - arcade machines,
+// consoles and computers running software, the lot. we only rule out things that
+// cannot run on their own or make a bad demo.
 - (BOOL)isAttractCandidate:(GameInfo*)game
 {
     if (game.gameName.length == 0)
         return NO;
-    if (![game.gameType isEqualToString:kGameInfoTypeArcade])
+
+    // the MAME menu pseudo-game, and snapshots which are pictures, not games
+    if (game.gameIsMame || game.gameIsSnapshot)
         return NO;
-    if (game.gameIsClone || game.gameIsMame || game.gameIsSnapshot || game.gameIsSoftware)
+
+    // a BIOS root is an empty system board, there is nothing to watch
+    if ([game.gameType isEqualToString:kGameInfoTypeBIOS])
         return NO;
+
+    // a bare console with no software loaded just sits there. this is the same rule
+    // the ROM browser uses for its `hideConsoles` filter.
+    if (game.gameIsConsole && game.gameSystem.length == 0)
+        return NO;
+
+    // software with no system or media assigned cannot just be launched - the ROM
+    // browser has to ask the user which system to run it on, see -play: in
+    // ChooseGameController. we go straight to EmulatorController, so skip these.
+    if (game.gameIsSoftware && (game.gameSystem.length == 0 || game.gameMediaType.length == 0))
+        return NO;
+
+    // clones are near duplicates of a parent that is already in the pool
+    if (game.gameIsClone)
+        return NO;
+
     if ([_notWorkingGames containsObject:game.gameName])
         return NO;
     if ([_badGames containsObject:game.gameName])
@@ -407,6 +439,17 @@ int g_attract_mode = 0;
         [_bag removeLastObject];
 
     return game;
+}
+
+// how long each game gets, from the Attract Mode section of Settings
+- (NSTimeInterval)gameDuration
+{
+    int index = [[Options alloc] init].attractDuration;
+
+    if (index < 0 || index >= (int)(sizeof(kAttractDurations) / sizeof(kAttractDurations[0])))
+        index = 0;
+
+    return kAttractDurations[index];
 }
 
 #pragma mark browser lifecycle
@@ -438,6 +481,22 @@ int g_attract_mode = 0;
     }];
 }
 
+// the user launched a game on their own - turn Attract Mode off so it does not
+// hijack the screen again the moment they come back to the browser and pause.
+// NOTE this deliberately does not go through -setEnabled:, which would call -stop
+// and exit the game the user just started.
+- (void)userDidStartGame
+{
+    if (!_enabled && !_running)
+        return;
+
+    AttractLog(@"USER STARTED A GAME, TURNING ATTRACT MODE OFF");
+
+    _enabled = NO;
+    [NSUserDefaults.standardUserDefaults setBool:NO forKey:ATTRACT_MODE_KEY];
+    [self endAttractSession];
+}
+
 - (void)noteUserActivity
 {
     if (_running)
@@ -448,18 +507,33 @@ int g_attract_mode = 0;
 
 #pragma mark start / next / stop
 
+// the ROM browser stays "visible" while Settings, Add ROMs, game info or an alert is
+// presented over it, and EmulatorController refuses to run a game in that state. so
+// check we are really frontmost before taking over, or we end up flagged as running
+// with no game behind the overlay.
+- (BOOL)isBrowserFrontmost
+{
+    UIViewController* presented = EmulatorController.sharedInstance.presentedViewController;
+    return presented != nil && presented.presentedViewController == nil;
+}
+
 - (void)start
 {
     if (_running || !_enabled || !_browserVisible)
         return;
 
+    if (![self isBrowserFrontmost]) {
+        AttractLog(@"NOT STARTING - something is presented over the ROM browser");
+        return [self restartIdleTimer];     // check back in another idle period
+    }
+
     GameInfo* game = [self nextGameInfo];
     if (game == nil) {
-        NSLog(@"ATTRACT: no arcade games to show");
+        AttractLog(@"NO GAMES TO SHOW");
         return;
     }
 
-    NSLog(@"ATTRACT: START %@", game.gameName);
+    AttractLog(@"START %@ (\"%@\")", game.gameName, game.gameTitle);
 
     _running = YES;
     _failureCount = 0;
@@ -478,7 +552,7 @@ int g_attract_mode = 0;
     if (game == nil)
         return [self stop];
 
-    NSLog(@"ATTRACT: NEXT %@", game.gameName);
+    AttractLog(@"NEXT %@ (\"%@\") - %d left in bag", game.gameName, game.gameTitle, (int)_bag.count);
 
     _failureCount = 0;
     [self updateOverlayForGame:game];
@@ -492,9 +566,11 @@ int g_attract_mode = 0;
 
     [_gameTimer invalidate];
     __weak AttractMode* _self = self;
-    _gameTimer = [NSTimer scheduledTimerWithTimeInterval:ATTRACT_GAME_DURATION repeats:NO block:^(NSTimer* timer) {
+    _gameTimer = [NSTimer scheduledTimerWithTimeInterval:self.gameDuration repeats:NO block:^(NSTimer* timer) {
         [_self skipToNextGame];
     }];
+
+    AttractLog(@"REQUEST PLAY %@", game.gameName);
 
     // when the ROM browser is up this routes through its selectGameCallback, which
     // dismisses the browser (saving scroll position) and then boots the game.
@@ -504,14 +580,20 @@ int g_attract_mode = 0;
 // MAME got the machine up - if it turned out to be a broken one, dont sit on it
 - (void)attractGameDidStart:(NSString*)name broken:(BOOL)broken
 {
-    if (!_running || !broken)
+    if (!_running)
         return;
 
-    // ignore a late report from a game we have already moved on from
-    if (![name isEqualToString:_currentGame.gameName])
+    // MAME started something other than what we asked for, so the overlay is now
+    // lying about what is on screen. dont sit on it for 30 seconds.
+    if (![name isEqualToString:_currentGame.gameName]) {
+        AttractLog(@"DESYNC - asked for %@ but MAME started %@, moving on", _currentGame.gameName, name);
+        return [self skipToNextGame];
+    }
+
+    if (!broken)
         return;
 
-    NSLog(@"ATTRACT: %@ IS NOT WORKING, SKIPPING", name);
+    AttractLog(@"%@ FLAGGED NOT_WORKING BY MAME, SKIPPING", name);
     [_badGames addObject:name];
     [self skipToNextGame];
 }
@@ -522,15 +604,19 @@ int g_attract_mode = 0;
     if (!_running)
         return;
 
+    AttractLog(@"GAME ENDED after %.1fsec (current=%@)",
+               NSDate.timeIntervalSinceReferenceDate - _gameStartTime, _currentGame.gameName);
+
     BOOL failed = (NSDate.timeIntervalSinceReferenceDate - _gameStartTime) < ATTRACT_MIN_RUN_TIME;
 
     if (failed) {
-        NSLog(@"ATTRACT: %@ FAILED TO RUN", _currentGame.gameName);
+        AttractLog(@"%@ ONLY RAN %.1fsec, TREATING AS FAILED (failure %d of %d)", _currentGame.gameName,
+                   NSDate.timeIntervalSinceReferenceDate - _gameStartTime, (int)_failureCount + 1, ATTRACT_MAX_FAILURES);
         if (_currentGame.gameName.length != 0)
             [_badGames addObject:_currentGame.gameName];
 
         if (++_failureCount >= ATTRACT_MAX_FAILURES) {
-            NSLog(@"ATTRACT: TOO MANY FAILURES, GIVING UP");
+            AttractLog(@"TOO MANY FAILURES, GIVING UP");
             return [self stop];
         }
 
@@ -550,7 +636,7 @@ int g_attract_mode = 0;
     if (!_running)
         return;
 
-    NSLog(@"ATTRACT: STOP");
+    AttractLog(@"STOP");
 
     // clear the flag first, so the ROM browser comes back up normally
     [self endAttractSession];
@@ -562,7 +648,7 @@ int g_attract_mode = 0;
     if (!_running)
         return;
 
-    NSLog(@"ATTRACT: KEEP PLAYING %@", _currentGame.gameName);
+    AttractLog(@"KEEP PLAYING %@", _currentGame.gameName);
 
     GameInfo* game = _currentGame;
     [self endAttractSession];
@@ -622,7 +708,7 @@ int g_attract_mode = 0;
         [parts addObject:game.gameManufacturer];
     _overlay.detailLabel.text = [parts componentsJoinedByString:@" · "];
 
-    [_overlay startProgress:ATTRACT_GAME_DURATION];
+    [_overlay startProgress:self.gameDuration];
 
     // come back to full strength for the new game, then fade back out of the way
     [_dimTimer invalidate];

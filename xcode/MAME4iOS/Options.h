@@ -24,6 +24,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (class, readonly, strong) NSString* optionsFile;
 
 @property (class, readonly, strong) NSArray* arrayEmuSpeed;
+@property (class, readonly, strong) NSArray* arrayAttractDuration;
 @property (class, readonly, strong) NSArray* arrayControlType;
 @property (class, readonly, strong) NSArray* arraySoundValue;
 @property (class, readonly, strong) NSArray* arraySkin;
@@ -103,6 +104,9 @@ NS_ASSUME_NONNULL_BEGIN
 @property (readwrite,assign) int useDRC;
 
 @property (readwrite,assign) int hideTestROMs;
+
+// index into arrayAttractDuration - how long each game gets in Attract Mode
+@property (readwrite,assign) int attractDuration;
 
 @end
 
