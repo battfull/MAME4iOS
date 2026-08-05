@@ -21,6 +21,9 @@
 + (NSArray*)arrayAttractDuration {
     return @[@"30 Seconds",@"1 Minute",@"2 Minutes",@"5 Minutes"];
 }
++ (NSArray*)arrayAttractSource {
+    return @[@"Random",@"My List"];
+}
 + (NSArray*)arrayControlType {
     return @[@"Keyboard",@"iCade or compatible",@"iCP, Gametel",@"iMpulse"];
 }
@@ -179,7 +182,11 @@
         
         _useDRC = 0;
         _hideTestROMs = 0;
+        _attractMode = 1;
+        _attractSource = 0;
         _attractDuration = 0;
+        _attractHideAdult = 0;
+        _attractPinned = 0;
     }
     else
     {
@@ -261,7 +268,12 @@
       
         _hideTestROMs = [[optionsDict objectForKey:@"hideTestROMs"] intValue];
 
+        // default ON, including for an existing options plist that predates the key
+        _attractMode = [([optionsDict objectForKey:@"attractMode"] ?: @(1)) intValue];
+        _attractSource = [[optionsDict objectForKey:@"attractSource"] intValue];
         _attractDuration = [[optionsDict objectForKey:@"attractDuration"] intValue];
+        _attractHideAdult = [[optionsDict objectForKey:@"attractHideAdult"] intValue];
+        _attractPinned = [[optionsDict objectForKey:@"attractPinned"] intValue];
     }
     
 }
@@ -340,7 +352,11 @@
                                  
                              [NSString stringWithFormat:@"%d", _useDRC], @"useDRC",
                              [NSString stringWithFormat:@"%d", _hideTestROMs], @"hideTestROMs",
+                             [NSString stringWithFormat:@"%d", _attractMode], @"attractMode",
+                             [NSString stringWithFormat:@"%d", _attractSource], @"attractSource",
                              [NSString stringWithFormat:@"%d", _attractDuration], @"attractDuration",
+                             [NSString stringWithFormat:@"%d", _attractHideAdult], @"attractHideAdult",
+                             [NSString stringWithFormat:@"%d", _attractPinned], @"attractPinned",
                              nil];
 }
 

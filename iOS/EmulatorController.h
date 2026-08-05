@@ -176,6 +176,20 @@ extern NSArray* g_import_file_types;
 #endif
 
 @property (readwrite,strong)  UIView *externalView;
+
+// when set, the emulator renders into this view instead of the main one, sized to the
+// view's own bounds (unlike externalView, which sizes to a whole display). used by
+// Attract Mode to show a live preview inside the ROM browser.
+@property (readwrite,strong)  UIView *embeddedView;
+
+// run a game without touching whatever is presented - the ROM browser stays up while
+// Attract Mode plays into its embeddedView. see -playGame: for the normal path.
+- (void)playGameEmbedded:(GameInfo*)game;
+
+// block/unblock the MAME thread. used by Attract Mode when its preview scrolls out of
+// view, so we are not burning the GPU on something nobody can see.
+// NOTE while paused MAME cannot process myosd_exitGame, so always resume before exiting.
+- (void)setEmulationPaused:(BOOL)paused;
 @property (readonly,assign) int stick_radio;
 #if TARGET_OS_IOS
 @property (strong, nonatomic) UIImpactFeedbackGenerator* impactFeedback;

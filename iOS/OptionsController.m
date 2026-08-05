@@ -50,6 +50,7 @@
 #import "HelpController.h"
 #import "EmulatorController.h"
 #import "ImageCache.h"
+#import "AttractMode.h"
 
 #if !TARGET_APPSTORE
 #import "CloudSync.h"
@@ -293,9 +294,35 @@
            {
                case 0:
                {
+                   cell.textLabel.text = NSLocalizedString(@"Attract Mode", @"Settings: Attract Mode Section: on/off");
+                   cell.accessoryView = [self optionSwitchForKey:@"attractMode"];
+                   break;
+               }
+               case 1:
+               {
+                   cell.textLabel.text = NSLocalizedString(@"Play Games From", @"Settings: Attract Mode Section: random or the user's list");
+                   cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                   cell.detailTextLabel.text = [Options.arrayAttractSource localizedOptionAtIndex:op.attractSource];
+                   break;
+               }
+               case 2:
+               {
+                   cell.textLabel.text = NSLocalizedString(@"Hide Adult Games", @"Settings: Attract Mode Section: skip the Adult category when picking at random");
+                   cell.accessoryView = [self optionSwitchForKey:@"attractHideAdult"];
+                   break;
+               }
+               case 3:
+               {
                    cell.textLabel.text = NSLocalizedString(@"Game Length", @"Settings: Attract Mode Section: how long each game plays");
                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                    cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
+                   break;
+               }
+               case 4:
+               {
+                   cell.textLabel.text = NSLocalizedString(@"My Attract Mode List", @"Settings: Attract Mode Section: edit the custom list");
+                   cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+                   cell.detailTextLabel.text = [NSString stringWithFormat:@"%d", (int)[AttractMode customList].count];
                    break;
                }
            }
@@ -497,7 +524,7 @@
           case kVideoSection: return 7;
           case kVectorSection: return 2;
           case kMiscSection: return 9;
-          case kAttractSection: return 1;
+          case kAttractSection: return 5;
           case kFilterSection: return 3;
           case kImportSection: return 4;
 #if !TARGET_APPSTORE
@@ -579,9 +606,16 @@
         }
         case kAttractSection:
         {
-            if (row==0) {
+            if (row==1) {
+                ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractSource" list:Options.arrayAttractSource title:cell.textLabel.text];
+                [[self navigationController] pushViewController:listController animated:YES];
+            }
+            if (row==3) {
                 ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
                 [[self navigationController] pushViewController:listController animated:YES];
+            }
+            if (row==4) {
+                [[self navigationController] pushViewController:[[AttractModeListController alloc] init] animated:YES];
             }
             break;
         }

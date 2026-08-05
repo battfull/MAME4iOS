@@ -41,6 +41,11 @@
 #endif
 
 #define CELL_IDENTIFIER   @"GameInfoCell"
+#define ATTRACT_CELL_IDENTIFIER @"AttractModeCell"
+// preview cell = 16:9 screen + this much for the countdown line and buttons
+#define ATTRACT_CELL_CHROME_HEIGHT (TARGET_OS_IOS ? 48.0 : 72.0)
+// never let the preview eat more of the screen than this, matters in landscape
+#define ATTRACT_MAX_HEIGHT_FRACTION 0.4
 #define HEADER_IDENTIFIER   @"GameInfoHeader"
 
 #if (TARGET_OS_IOS && !TARGET_OS_MACCATALYST)
@@ -165,16 +170,16 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     NSIndexPath* _currentlyFocusedIndexPath;
     UIImage* _loadingImage;
     NSCache* _system_description;
-    UISegmentedControl* _attractSegment;    // iOS: momentary one-segment button
-    UIBarButtonItem* _attractItem;          // the nav bar item wrapping it
-    CGFloat _attractSymbolSize;             // point size for the on/off symbol
+    AttractModeCell* _pinnedAttract;    // the preview when pinned to the top, else nil
+    UIView* _pinnedAttractBackdrop;     // opaque fill behind it, so scrolled content cannot show through
+    CGFloat _pinnedAttractHeight;       // how much top contentInset we added for it
 }
 @end
 
 @implementation ChooseGameController
 
 + (NSArray<NSString*>*) allSettingsKeys {
-    return @[LAYOUT_MODE_KEY, SCOPE_MODE_KEY, RECENT_GAMES_KEY, FAVORITE_GAMES_KEY, COLLAPSED_STATE_KEY, SELECTED_GAME_KEY, SELECTED_GAME_SECTION_KEY, ATTRACT_MODE_KEY];
+    return @[LAYOUT_MODE_KEY, SCOPE_MODE_KEY, RECENT_GAMES_KEY, FAVORITE_GAMES_KEY, COLLAPSED_STATE_KEY, SELECTED_GAME_KEY, SELECTED_GAME_SECTION_KEY];
 }
 
 - (instancetype)init
@@ -307,13 +312,6 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     
     self.navigationItem.rightBarButtonItems = @[addRoms, settings, layout, scope];
 
-    // attract mode - play a random game when the user goes idle in here.
-    // NOTE this goes on the *left*, next to the logo. the right side is already full
-    // (add roms, settings, layout, scope) and a fifth item makes iOS collapse the
-    // overflow into a "..." menu, hiding the settings and add-roms buttons.
-    UIBarButtonItem* attract = [self makeAttractModeButton:height];
-    self.navigationItem.leftBarButtonItems = @[self.navigationItem.leftBarButtonItem, attract];
-
 #if TARGET_OS_IOS
     if (@available(iOS 13.0, *)) {
         UISegmentedControl* appearance = [UISegmentedControl appearanceWhenContainedInInstancesOfClasses:@[[UINavigationBar class]]];
@@ -367,6 +365,7 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     
     // collection view
     [self.collectionView registerClass:[GameInfoCell class] forCellWithReuseIdentifier:CELL_IDENTIFIER];
+    [self.collectionView registerClass:[AttractModeCell class] forCellWithReuseIdentifier:ATTRACT_CELL_IDENTIFIER];
     [self.collectionView registerClass:[GameInfoHeader class] forSupplementaryViewOfKind:UICollectionElementKindSectionHeader withReuseIdentifier:HEADER_IDENTIFIER];
     
     self.collectionView.backgroundColor = BACKGROUND_COLOR;
@@ -408,68 +407,122 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 #endif
 }
 
-#pragma mark - attract mode
-
-// a momentary button whose icon fills in while Attract Mode is armed.
-// NOTE momentary matters - a *selected* segment does not send valueChanged when you
-// tap it again, which would leave no way to turn Attract Mode back off.
-- (UIBarButtonItem*)makeAttractModeButton:(CGFloat)pointSize
-{
-    _attractSymbolSize = pointSize;
-
-#if TARGET_OS_TV
-    _attractItem = [[UIBarButtonItem alloc] initWithImage:nil style:UIBarButtonItemStylePlain target:self action:@selector(attractModeChange:)];
-#else
-    _attractSegment = [[UISegmentedControl alloc] initWithItems:@[@""]];
-    _attractSegment.momentary = YES;
-    [_attractSegment addTarget:self action:@selector(attractModeChange:) forControlEvents:UIControlEventValueChanged];
-    _attractItem = [[UIBarButtonItem alloc] initWithCustomView:_attractSegment];
-#endif
-
-    [self updateAttractModeButton];
-    return _attractItem;
-}
-
-- (void)updateAttractModeButton
-{
-    BOOL on = [AttractMode.shared isEnabled];
-
-    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:_attractSymbolSize];
-    UIImage* image = [UIImage systemImageNamed:(on ? @"play.rectangle.fill" : @"play.rectangle") withConfiguration:config];
-    NSString* label = on ? NSLocalizedString(@"Attract Mode On", @"Attract Mode toggle, on") :
-                           NSLocalizedString(@"Attract Mode Off", @"Attract Mode toggle, off");
-
-#if TARGET_OS_TV
-    _attractItem.image = image;
-    _attractItem.accessibilityLabel = label;
-#else
-    if (image != nil)
-        [_attractSegment setImage:image forSegmentAtIndex:0];
-    else
-        [_attractSegment setTitle:(on ? @"▶" : @"▷") forSegmentAtIndex:0];
-    _attractSegment.accessibilityLabel = label;
-#endif
-}
-
-- (void)attractModeChange:(id)sender
-{
-    BOOL on = ![AttractMode.shared isEnabled];
-    NSLog(@"ATTRACT MODE: %@", on ? @"ON" : @"OFF");
-
-    AttractMode.shared.enabled = on;
-    [self updateAttractModeButton];
-
-    // turning it on starts a game right away, so there is no time for a toast
-    if (!on)
-        [self.view makeToast:NSLocalizedString(@"Attract Mode off", @"Attract Mode disabled toast")
-                    duration:2.0 position:CSToastPositionBottom];
-}
-
 #pragma mark -
+
+- (void)viewWillTransitionToSize:(CGSize)size withTransitionCoordinator:(id<UIViewControllerTransitionCoordinator>)coordinator
+{
+    [super viewWillTransitionToSize:size withTransitionCoordinator:coordinator];
+
+    [coordinator animateAlongsideTransition:nil completion:^(id<UIViewControllerTransitionCoordinatorContext> context) {
+        // the panel is sized from the view, and pinning may no longer be allowed, so
+        // tear it down and let reloadAttractSection put back whatever now fits.
+        // NOTE done in the completion, not viewWillLayoutSubviews - building the panel
+        // lays out immediately and would recurse if we did it mid layout pass.
+        [self setAttractPinned:NO];
+        [self reloadAttractSection];
+    }];
+}
 
 -(void)viewWillAppear:(BOOL)animated
 {
     [super viewWillAppear:animated];
+
+    [self reloadAttractSection];
+}
+
+// add or remove the Attract Mode preview section to match the Settings switch. called
+// on appear, and directly by EmulatorController when Settings is dismissed (it is a
+// page sheet, so we never get a viewWillAppear for it).
+- (void)reloadAttractSection
+{
+    if (_isSearchResults || !self.isViewLoaded)
+        return;
+
+    BOOL enabled = [AttractMode.shared isEnabled];
+
+    // a pinned panel plus the ROM list does not fit in landscape on a phone. keep the
+    // saved preference, just ignore it here and hide the pin button.
+    AttractMode.shared.pinningAvailable = [self canPinAttract];
+    BOOL pinned = enabled && [AttractMode isPinned] && [self canPinAttract];
+
+    [self setAttractPinned:pinned];
+
+    // pinned lives in its own panel, so it must not also be a section
+    if ((enabled && !pinned) != [self isAttractSection:0])
+        [self filterGameList];
+}
+
+// vertically compact is iPhone landscape - iPad and Mac keep their room, so they can
+// still pin in either orientation.
+- (BOOL)canPinAttract
+{
+    return self.traitCollection.verticalSizeClass != UIUserInterfaceSizeClassCompact;
+}
+
+// when pinned the preview leaves the collection view and sits above it, always
+// visible. we inset the collection view by its height so nothing hides behind it.
+- (void)setAttractPinned:(BOOL)pinned
+{
+    if (pinned == (_pinnedAttract != nil))
+        return;
+
+    UIEdgeInsets inset = self.collectionView.contentInset;
+
+    if (!pinned) {
+        [AttractMode.shared detachInlineCell:_pinnedAttract];
+        [_pinnedAttract removeFromSuperview];
+        [_pinnedAttractBackdrop removeFromSuperview];
+        _pinnedAttract = nil;
+        _pinnedAttractBackdrop = nil;
+
+        inset.top -= _pinnedAttractHeight;
+        self.collectionView.contentInset = inset;
+        _pinnedAttractHeight = 0.0;
+        return;
+    }
+
+    // never taller than a chunk of the screen, the ROM list still has to be usable
+    CGFloat width = self.view.bounds.size.width - (SECTION_INSET_X * 2);
+    CGFloat height = MIN(floor(width * 9.0 / 16.0) + ATTRACT_CELL_CHROME_HEIGHT,
+                         floor(self.view.bounds.size.height * ATTRACT_MAX_HEIGHT_FRACTION));
+
+    // contentInset only decides where the list *rests*, it still scrolls underneath,
+    // so the pinned area needs something opaque behind it. the backdrop runs all the
+    // way to the top of the view so scrolled content cannot show through the
+    // translucent navigation bar either.
+    UIView* backdrop = [[UIView alloc] init];
+    backdrop.backgroundColor = BACKGROUND_COLOR;
+    backdrop.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:backdrop];
+
+    AttractModeCell* panel = [[AttractModeCell alloc] initWithFrame:CGRectMake(0, 0, width, height)];
+    panel.translatesAutoresizingMaskIntoConstraints = NO;
+    [self.view addSubview:panel];
+
+    UILayoutGuide* safe = self.view.safeAreaLayoutGuide;
+    [NSLayoutConstraint activateConstraints:@[
+        [panel.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:SECTION_INSET_X],
+        [panel.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-SECTION_INSET_X],
+        [panel.topAnchor constraintEqualToAnchor:safe.topAnchor],
+        [panel.heightAnchor constraintEqualToConstant:height],
+
+        [backdrop.leadingAnchor constraintEqualToAnchor:self.view.leadingAnchor],
+        [backdrop.trailingAnchor constraintEqualToAnchor:self.view.trailingAnchor],
+        [backdrop.topAnchor constraintEqualToAnchor:self.view.topAnchor],
+        [backdrop.bottomAnchor constraintEqualToAnchor:panel.bottomAnchor constant:SECTION_INSET_Y],
+    ]];
+
+    _pinnedAttract = panel;
+    _pinnedAttractBackdrop = backdrop;
+    _pinnedAttractHeight = height + SECTION_INSET_Y;
+
+    inset.top += _pinnedAttractHeight;
+    self.collectionView.contentInset = inset;
+
+    // the emulator sizes itself to the container's bounds, which autolayout has not
+    // worked out yet - settle the frames before handing the view over
+    [self.view layoutIfNeeded];
+    [AttractMode.shared attachInlineCell:panel];
 }
 -(void)viewDidAppear:(BOOL)animated
 {
@@ -915,6 +968,14 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         }
     }
     
+    // Attract Mode preview goes at the very top, above Recents and Favorites. it holds
+    // one placeholder item so the collection view gives us a cell to render into.
+    // when pinned it lives in its own panel above the collection view instead
+    if (!_isSearchResults && [AttractMode.shared isEnabled] && ![AttractMode isPinned]) {
+        gameSectionTitles = [@[ATTRACT_SECTION_TITLE] arrayByAddingObjectsFromArray:gameSectionTitles];
+        gameData[ATTRACT_SECTION_TITLE] = @[[[GameInfo alloc] initWithDictionary:@{}]];
+    }
+
     if (self.isViewLoaded)
         [self saveSelection];
     
@@ -1301,8 +1362,18 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         num = MIN(num, _layoutCollums);
     return num;
 }
+// TRUE for the synthetic Attract Mode preview section, which holds no real game
+-(BOOL)isAttractSection:(NSInteger)section
+{
+    return section >= 0 && section < _gameSectionTitles.count &&
+           [_gameSectionTitles[section] isEqualToString:ATTRACT_SECTION_TITLE];
+}
+
 -(GameInfo*)getGameInfo:(NSIndexPath*)indexPath
 {
+    if ([self isAttractSection:indexPath.section])
+        return nil;
+
     if (indexPath.section >= _gameSectionTitles.count)
         return nil;
     
@@ -1564,6 +1635,21 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 // get size of an item
 - (CGSize)collectionView:(UICollectionView *)collectionView layout:(UICollectionViewFlowLayout *)layout sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
 
+    // the preview spans the full width, whatever the layout mode
+    if ([self isAttractSection:indexPath.section]) {
+        // same arithmetic as -updateLayout, so we line up with the game cells
+        CGFloat width = collectionView.bounds.size.width - (layout.sectionInset.left + layout.sectionInset.right);
+        width -= (self.view.safeAreaInsets.left + self.view.safeAreaInsets.right);
+        width -= (collectionView.adjustedContentInset.left + collectionView.adjustedContentInset.right);
+        width = MAX(width, 1.0);
+
+        // 16:9 at full width is over half the screen in landscape, which leaves no room
+        // to browse. cap it and let the game letterbox inside the container.
+        CGFloat height = MIN(floor(width * 9.0 / 16.0) + ATTRACT_CELL_CHROME_HEIGHT,
+                             floor(collectionView.bounds.size.height * ATTRACT_MAX_HEIGHT_FRACTION));
+        return CGSizeMake(width, MAX(height, ATTRACT_CELL_CHROME_HEIGHT + 1.0));
+    }
+
     if (_layoutMode == LayoutList || _layoutCollums == 0)
         return layout.itemSize;
 
@@ -1579,7 +1665,10 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 - (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView cellForItemAtIndexPath:(NSIndexPath *)indexPath
 {
     NSLog(@"cellForItemAtIndexPath: %d.%d %@", (int)indexPath.section, (int)indexPath.item, [self getGameInfo:indexPath].gameName);
-    
+
+    if ([self isAttractSection:indexPath.section])
+        return [collectionView dequeueReusableCellWithReuseIdentifier:ATTRACT_CELL_IDENTIFIER forIndexPath:indexPath];
+
     GameInfo* game = [self getGameInfo:indexPath];
     
     GameInfoCell* cell = [collectionView dequeueReusableCellWithReuseIdentifier:CELL_IDENTIFIER forIndexPath:indexPath];
@@ -1703,6 +1792,10 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     // UICollectionViewFlowLayout will center a section with a single item in it, else it will left align, WTF!
     // we want left aligned all the time, so mess with the section inset to make it do the right thing.
     
+    // the Attract Mode preview is full width already, it must not get the padding below
+    if ([self isAttractSection:section])
+        return layout.sectionInset;
+
     if (section >= [_gameSectionTitles count] || [_gameData[_gameSectionTitles[section]] count] != 1)
         return layout.sectionInset;
             
@@ -1783,8 +1876,24 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
         
     return cell;
 }
+- (void)collectionView:(UICollectionView *)collectionView willDisplayCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath
+{
+    if ([cell isKindOfClass:[AttractModeCell class]])
+        [AttractMode.shared attachInlineCell:(AttractModeCell*)cell];
+}
+
+- (void)collectionView:(UICollectionView *)collectionView didEndDisplayingCell:(UICollectionViewCell *)cell forItemAtIndexPath:(NSIndexPath *)indexPath
+{
+    if ([cell isKindOfClass:[AttractModeCell class]])
+        [AttractMode.shared detachInlineCell:(AttractModeCell*)cell];
+}
+
 - (void)collectionView:(UICollectionView *)collectionView didSelectItemAtIndexPath:(NSIndexPath *)indexPath
 {
+    // the preview section has no game to select, its own buttons handle everything
+    if ([self isAttractSection:indexPath.section])
+        return;
+
     GameInfo* game = [self getGameInfo:indexPath];
     
     NSLog(@"DID SELECT ITEM[%d.%d] %@", (int)indexPath.section, (int)indexPath.item, game.gameName);
@@ -1798,6 +1907,9 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
 
 -(void)play:(GameInfo*)game
 {
+    if (game == nil || game.gameName.length == 0)
+        return;
+
     if (game.gameIsSnapshot)
         return;
     
@@ -2175,6 +2287,17 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
         ];
     }
     
+    // Attract Mode list
+    BOOL in_attract = [AttractMode isInCustomList:game];
+    NSString* attract_text = in_attract ? NSLocalizedString(@"Remove from Attract Mode",@"") : NSLocalizedString(@"Add to Attract Mode",@"");
+    NSString* attract_icon = in_attract ? @"play.slash" : @"play.rectangle";
+
+    actions = [actions arrayByAddingObject:
+        [UIAlertAction actionWithTitle:attract_text symbol:attract_icon style:UIAlertActionStyleDefault handler:^(id action) {
+            [AttractMode setGame:game inCustomList:!in_attract];
+        }]
+    ];
+
     if ([self isRecent:game] && [self->_gameSectionTitles[indexPath.section] isEqualToString:RECENT_GAMES_TITLE]) {
         actions = [actions arrayByAddingObject:
             [UIAlertAction actionWithTitle:NSLocalizedString(@"Remove from Recently Played",@"") symbol:@"minus.circle" style:UIAlertActionStyleDefault handler:^(id action) {

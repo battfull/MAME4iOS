@@ -632,6 +632,9 @@
         }
       }
     },
+    "Add to Attract Mode" : {
+
+    },
     "Add to Favorites" : {
       "localizations" : {
         "ja" : {
@@ -787,16 +790,7 @@
       }
     },
     "Attract Mode" : {
-      "comment" : "Section header for Attract Mode settings"
-    },
-    "Attract Mode off" : {
-      "comment" : "Attract Mode disabled toast"
-    },
-    "Attract Mode Off" : {
-      "comment" : "Attract Mode toggle, off"
-    },
-    "Attract Mode On" : {
-      "comment" : "Attract Mode toggle, on"
+      "comment" : "Section header for Attract Mode settings\nSettings: Attract Mode Section: on/off"
     },
     "Auto" : {
       "localizations" : {
@@ -1462,6 +1456,9 @@
         }
       }
     },
+    "Full Screen" : {
+      "comment" : "Attract Mode expand button"
+    },
     "Fullscreen" : {
       "comment" : "Section header for fullscreen display options",
       "localizations" : {
@@ -1665,6 +1662,9 @@
           }
         }
       }
+    },
+    "Hide Adult Games" : {
+      "comment" : "Settings: Attract Mode Section: skip the Adult category when picking at random"
     },
     "Hide BIOS" : {
       "comment" : "Filter option to hide BIOS files from the list",
@@ -1936,6 +1936,9 @@
         }
       }
     },
+    "Long press a game in the ROM list and choose Add to Attract Mode." : {
+      "comment" : "Attract Mode empty list hint"
+    },
     "Make First Favorite" : {
       "localizations" : {
         "ja" : {
@@ -2038,6 +2041,9 @@
         }
       }
     },
+    "My Attract Mode List" : {
+      "comment" : "Attract Mode custom list screen\nSettings: Attract Mode Section: edit the custom list"
+    },
     "Nearest" : {
       "comment" : "Nearest",
       "extractionState" : "stale",
@@ -2088,6 +2094,9 @@
           }
         }
       }
+    },
+    "No games yet" : {
+      "comment" : "Attract Mode empty list"
     },
     "No Shadow Mask but Blurred" : {
       "comment" : "No Shadow Mask but Blurred",
@@ -2329,6 +2338,9 @@
         }
       }
     },
+    "Pin Attract Mode" : {
+      "comment" : "Attract Mode pin button"
+    },
     "Play" : {
       "localizations" : {
         "ja" : {
@@ -2344,6 +2356,9 @@
           }
         }
       }
+    },
+    "Play Games From" : {
+      "comment" : "Settings: Attract Mode Section: random or the user's list"
     },
     "Play With..." : {
       "localizations" : {
@@ -2427,6 +2442,9 @@
           }
         }
       }
+    },
+    "Remove from Attract Mode" : {
+
     },
     "Remove from Favorites" : {
       "localizations" : {
@@ -3330,6 +3348,9 @@
           }
         }
       }
+    },
+    "Unpin Attract Mode" : {
+      "comment" : "Attract Mode unpin button"
     },
     "Use as Title Image" : {
       "localizations" : {

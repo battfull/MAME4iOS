@@ -31,6 +31,9 @@ NS_ASSUME_NONNULL_BEGIN
 // add a game to the Recently Played list (used by Attract Mode)
 + (void)addRecentGame:(GameInfo*)game;
 
+// add or remove the Attract Mode preview section to match the Settings switch
+- (void)reloadAttractSection;
+
 +(NSAttributedString*)getGameText:(GameInfo*)game;
 +(UIImage*)getGameIcon:(GameInfo*)game;
 

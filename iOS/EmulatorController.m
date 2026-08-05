@@ -927,6 +927,7 @@ void m4i_game_stop(void)
 @implementation EmulatorController
 
 @synthesize externalView;
+@synthesize embeddedView;
 @synthesize stick_radio;
 
 #if TARGET_OS_IOS
@@ -1787,6 +1788,17 @@ UIViewController* g_menu;
         [self updateOptions];
         [self changeUI];
         [self checkForNewRoms];
+
+        // Settings is a page sheet, so the ROM browser behind it never gets a
+        // viewWillAppear - tell it directly that the Attract Mode switch may have moved.
+        // NOTE topViewController walks presentedViewController, so it hands back the
+        // navigation controller the browser lives in, not the browser itself.
+        [AttractMode.shared reloadOptions];
+        UIViewController* top = self.topViewController;
+        if ([top isKindOfClass:[UINavigationController class]])
+            top = [(UINavigationController*)top topViewController];
+        if ([top isKindOfClass:[ChooseGameController class]])
+            [(ChooseGameController*)top reloadAttractSection];
         
         // dont call endMenu (and unpause MAME) if we still have a dialog up.
         if (self.presentedViewController == nil)
@@ -2138,6 +2150,10 @@ ButtonPressType input_debounce(unsigned long pad_status, CGPoint stick) {
 }
 
 -(void)buildLogoView {
+    // the Attract Mode preview owns its cell, no logo or airplay placeholder in it
+    if (embeddedView != nil)
+        return;
+
     // no need to show logo in fullscreen. (unless benchmark or first boot)
     if ((g_device_is_fullscreen || TARGET_OS_TV) && !g_mame_benchmark && !(g_mame_first_boot && g_mame_game_info.gameName.length == 0))
         return;
@@ -3399,7 +3415,7 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
         return;
     }
     
-    CGFloat scale = externalView ? externalView.window.screen.scale : UIScreen.mainScreen.scale;
+    CGFloat scale = (embeddedView ?: externalView) ? (embeddedView ?: externalView).window.screen.scale : UIScreen.mainScreen.scale;
     
     CGFloat cap_x = floor((image.size.width * image.scale  - 1.0) / 2.0) / image.scale;
     CGFloat cap_y = floor((image.size.height * image.scale - 1.0) / 2.0) / image.scale;
@@ -3464,7 +3480,7 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     if (g_joy_used == JOY_USED_GAMEPAD && g_pref_full_screen_joy)
          g_device_is_fullscreen = TRUE;
 
-    if (externalView != nil)
+    if (externalView != nil || embeddedView != nil)
         g_device_is_fullscreen = FALSE;
     
     g_direct_mouse_enable = TRUE;
@@ -3495,7 +3511,9 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     [self setNeedsUpdateOfHomeIndicatorAutoHidden];
     [self setNeedsUpdateOfScreenEdgesDeferringSystemGestures];
 
-    if (externalView != nil)
+    if (embeddedView != nil)
+        r = embeddedView.bounds;
+    else if (externalView != nil)
         r = externalView.window.screen.bounds;
     else if (g_device_is_fullscreen)
         r = rFrames[g_device_is_landscape ? LANDSCAPE_VIEW_FULL : PORTRAIT_VIEW_FULL];
@@ -3503,7 +3521,7 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
         r = rFrames[g_device_is_landscape ? LANDSCAPE_VIEW_NOT_FULL : PORTRAIT_VIEW_NOT_FULL];
 
     // Handle Safe Area (iPhone X and above) adjust the view down away from the notch, before adjusting for aspect
-    if ( externalView == nil ) {
+    if ( externalView == nil && embeddedView == nil ) {
         UIEdgeInsets safeArea = self.view.safeAreaInsets;
 
         // in fullscreen mode, we dont want to correct for the bottom inset, because we hide the home indicator.
@@ -3521,7 +3539,7 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     r = [[UIScreen mainScreen] bounds];
 #endif
     // get the output device scale (mainSreen or external display)
-    CGFloat scale = (externalView ?: self.view).window.screen.scale;
+    CGFloat scale = (embeddedView ?: externalView ?: self.view).window.screen.scale;
     
     // NOTE: view.window may be nil use mainScreen.scale in this case.
     if (scale == 0.0)
@@ -3646,7 +3664,7 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     screenView.userInteractionEnabled = NO;
     [screenView setOptions:options];
     
-    UIView* superview = (externalView ?: self.view);
+    UIView* superview = (embeddedView ?: externalView ?: self.view);
     if (screenView.superview != superview) {
         [screenView removeFromSuperview];
         [superview addSubview:screenView];
@@ -6134,6 +6152,37 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
     myosd_exitGame = 2; // force a hard exit, exit menu mode, exit app, start new game or menu.
 }
 
+// run a game while leaving the presented ROM browser alone. this is the tail of
+// -playGame: without the dismiss-whatever-is-up handling, so Attract Mode can play
+// into its embeddedView with the browser still on screen.
+-(void)playGameEmbedded:(GameInfo*)game {
+    NSLog(@"PLAY EMBEDDED: %@", game);
+
+    if (game.gameName.length == 0)
+        return;
+
+    g_mame_game_info = game;
+    set_mame_globals(game);
+
+    change_pause(PAUSE_FALSE);
+    myosd_exitGame = 2; // force a hard exit, exit menu mode, start the new game
+}
+
+// re-parent the live screen view when the host view changes, without waiting for the
+// next changeUI (which only happens when a game starts).
+-(void)setEmbeddedView:(UIView *)view {
+    if (embeddedView == view)
+        return;
+
+    embeddedView = view;
+    [self changeUI];
+}
+
+-(void)setEmulationPaused:(BOOL)paused {
+    NSLog(@"setEmulationPaused: %d", paused);
+    change_pause(paused ? PAUSE_THREAD : PAUSE_FALSE);
+}
+
 -(void)reload {
     [self performSelectorOnMainThread:@selector(playGame:) withObject:nil waitUntilDone:NO];
 }
@@ -6251,8 +6300,9 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
 
         // the user picked a game themselves, so stand down. NOTE Attract Mode routes
         // its own launches through this same callback, so only do this when it is not
-        // the one asking.
-        if (!g_attract_mode)
+        // the one asking. do NOT test g_attract_mode here - that is set the whole time
+        // the inline preview is playing, which is exactly while the user is browsing.
+        if (![AttractMode.shared isLaunchingGame])
             [AttractMode.shared userDidStartGame];
 
 
