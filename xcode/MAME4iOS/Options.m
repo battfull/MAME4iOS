@@ -7,6 +7,7 @@
 //
 
 #import "Options.h"
+#import "GameList.h"
 #import "Globals.h"
 #import "SkinManager.h"         // for skinList
 #import "MetalScreenView.h"     // for shader and filter list
@@ -22,7 +23,10 @@
     return @[@"30 Seconds",@"1 Minute",@"2 Minutes",@"5 Minutes"];
 }
 + (NSArray*)arrayAttractSource {
-    return @[@"Random",@"My List"];
+    NSMutableArray* sources = [[NSMutableArray alloc] initWithObjects:ATTRACT_SOURCE_RANDOM, nil];
+    for (GameList* list in [GameList allLists])
+        [sources addObject:list.name];
+    return sources;
 }
 + (NSArray*)arrayControlType {
     return @[@"Keyboard",@"iCade or compatible",@"iCP, Gametel",@"iMpulse"];
@@ -183,7 +187,7 @@
         _useDRC = 0;
         _hideTestROMs = 0;
         _attractMode = 1;
-        _attractSource = 0;
+        _attractSource = ATTRACT_SOURCE_RANDOM;
         _attractDuration = 0;
         _attractHideAdult = 0;
         _attractPinned = 0;
@@ -270,7 +274,12 @@
 
         // default ON, including for an existing options plist that predates the key
         _attractMode = [([optionsDict objectForKey:@"attractMode"] ?: @(1)) intValue];
-        _attractSource = [[optionsDict objectForKey:@"attractSource"] intValue];
+        _attractSource = [optionsDict objectForKey:@"attractSource"] ?: ATTRACT_SOURCE_RANDOM;
+        // pre-Lists this was an index, 0 = Random and 1 = the one Attract Mode list
+        if ([_attractSource isEqualToString:@"1"])
+            _attractSource = NSLocalizedString(@"My List", @"name given to the pre-Lists Attract Mode list");
+        else if ([_attractSource isEqualToString:@"0"])
+            _attractSource = ATTRACT_SOURCE_RANDOM;
         _attractDuration = [[optionsDict objectForKey:@"attractDuration"] intValue];
         _attractHideAdult = [[optionsDict objectForKey:@"attractHideAdult"] intValue];
         _attractPinned = [[optionsDict objectForKey:@"attractPinned"] intValue];
@@ -353,7 +362,7 @@
                              [NSString stringWithFormat:@"%d", _useDRC], @"useDRC",
                              [NSString stringWithFormat:@"%d", _hideTestROMs], @"hideTestROMs",
                              [NSString stringWithFormat:@"%d", _attractMode], @"attractMode",
-                             [NSString stringWithFormat:@"%d", _attractSource], @"attractSource",
+                             _attractSource ?: ATTRACT_SOURCE_RANDOM, @"attractSource",
                              [NSString stringWithFormat:@"%d", _attractDuration], @"attractDuration",
                              [NSString stringWithFormat:@"%d", _attractHideAdult], @"attractHideAdult",
                              [NSString stringWithFormat:@"%d", _attractPinned], @"attractPinned",

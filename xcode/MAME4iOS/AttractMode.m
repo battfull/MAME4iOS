@@ -10,6 +10,7 @@
 #import "ChooseGameController.h"
 #import "EmulatorController.h"
 #import "Options.h"
+#import "GameList.h"
 #import "MAME4iOS-Swift.h"
 
 #if !__has_feature(objc_arc)
@@ -560,96 +561,6 @@ void AttractLog(NSString* format, ...)
 
 @end
 
-#pragma mark - custom list table
-
-@implementation AttractModeListController
-{
-    NSMutableArray<GameInfo*>* _games;
-}
-
-- (void)viewDidLoad
-{
-    [super viewDidLoad];
-    self.title = NSLocalizedString(@"My Attract Mode List", @"Attract Mode custom list screen");
-#if TARGET_OS_IOS
-    self.navigationItem.rightBarButtonItem = self.editButtonItem;
-#endif
-}
-
-- (void)viewWillAppear:(BOOL)animated
-{
-    [super viewWillAppear:animated];
-    _games = [[AttractMode customList] mutableCopy];
-    [self.tableView reloadData];
-}
-
-- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
-{
-    return MAX(_games.count, 1);    // one row of explanatory text when empty
-}
-
-- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle reuseIdentifier:nil];
-
-    if (_games.count == 0) {
-        cell.textLabel.text = NSLocalizedString(@"No games yet", @"Attract Mode empty list");
-        cell.detailTextLabel.text = NSLocalizedString(@"Long press a game in the ROM list and choose Add to Attract Mode.", @"Attract Mode empty list hint");
-        cell.detailTextLabel.numberOfLines = 0;
-        cell.textLabel.textColor = UIColor.grayColor;
-        cell.selectionStyle = UITableViewCellSelectionStyleNone;
-        return cell;
-    }
-
-    GameInfo* game = _games[indexPath.row];
-    cell.textLabel.text = game.gameTitle.length != 0 ? game.gameTitle : game.gameDescription;
-    cell.detailTextLabel.text = game.gameManufacturer;
-    return cell;
-}
-
-- (BOOL)tableView:(UITableView *)tableView canEditRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    return _games.count != 0;
-}
-
-- (void)tableView:(UITableView *)tableView commitEditingStyle:(UITableViewCellEditingStyle)style forRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    if (style != UITableViewCellEditingStyleDelete || indexPath.row >= _games.count)
-        return;
-
-    [self removeGameAtIndex:indexPath.row];
-
-    // the empty-state row takes the place of the last real one, so reload rather
-    // than delete when we just emptied the list
-    if (_games.count == 0)
-        [tableView reloadData];
-    else
-        [tableView deleteRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationAutomatic];
-}
-
-- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
-{
-    [tableView deselectRowAtIndexPath:indexPath animated:YES];
-
-#if TARGET_OS_TV
-    // no swipe to delete on tvOS, so selecting a row removes it
-    if (indexPath.row < _games.count) {
-        [self removeGameAtIndex:indexPath.row];
-        [tableView reloadData];
-    }
-#endif
-}
-
-- (void)removeGameAtIndex:(NSUInteger)index
-{
-    GameInfo* game = _games[index];
-    [_games removeObjectAtIndex:index];
-    [AttractMode setGame:game inCustomList:NO];
-    AttractLog(@"REMOVED %@ FROM LIST", game.gameName);
-}
-
-@end
-
 #pragma mark - AttractMode
 
 @implementation AttractMode
@@ -731,18 +642,6 @@ void AttractLog(NSString* format, ...)
 
 #pragma mark game list
 
-+ (NSArray<GameInfo*>*)customList
-{
-    NSArray* saved = [NSUserDefaults.standardUserDefaults arrayForKey:ATTRACT_LIST_KEY] ?: @[];
-
-    NSMutableArray* games = [[NSMutableArray alloc] init];
-    for (NSDictionary* dict in saved) {
-        if ([dict isKindOfClass:[NSDictionary class]])
-            [games addObject:[[GameInfo alloc] initWithDictionary:dict]];
-    }
-    return games;
-}
-
 + (BOOL)isPinned
 {
     return [[Options alloc] init].attractPinned != 0;
@@ -791,29 +690,6 @@ void AttractLog(NSString* format, ...)
     return [top isKindOfClass:[ChooseGameController class]] ? (ChooseGameController*)top : nil;
 }
 
-+ (BOOL)isInCustomList:(GameInfo*)game
-{
-    NSArray* saved = [NSUserDefaults.standardUserDefaults arrayForKey:ATTRACT_LIST_KEY] ?: @[];
-    return [saved containsObject:game.gameDictionary];
-}
-
-+ (void)setGame:(GameInfo*)game inCustomList:(BOOL)flag
-{
-    if (game == nil || game.gameName.length == 0)
-        return;
-
-    NSMutableArray* saved = [([NSUserDefaults.standardUserDefaults arrayForKey:ATTRACT_LIST_KEY] ?: @[]) mutableCopy];
-
-    [saved removeObject:game.gameDictionary];
-    if (flag)
-        [saved addObject:game.gameDictionary];
-
-    [NSUserDefaults.standardUserDefaults setObject:saved forKey:ATTRACT_LIST_KEY];
-
-    // the pool changed, build a fresh bag next time round
-    [AttractMode.shared invalidateBag];
-}
-
 - (void)setGameList:(NSArray<GameInfo*>*)games
 {
     _gameList = [games copy];
@@ -825,10 +701,15 @@ void AttractLog(NSString* format, ...)
     [_bag removeAllObjects];
 }
 
-// TRUE when Settings says to play the user's own list instead of a random draw
-- (BOOL)useCustomList
+// the list Settings says to play from, or nil for a random draw
+- (GameList*)sourceList
 {
-    return [[Options alloc] init].attractSource != 0;
+    NSString* source = [[Options alloc] init].attractSource;
+
+    if (source.length == 0 || [source isEqualToString:ATTRACT_SOURCE_RANDOM])
+        return nil;
+
+    return [GameList listNamed:source];
 }
 
 // MAME knows which drivers are NOT_WORKING, but that flag does not survive into GameInfo,
@@ -910,15 +791,17 @@ void AttractLog(NSString* format, ...)
 - (GameInfo*)nextGameInfo
 {
     if (_bag.count == 0) {
-        // the user's own list, if they picked one and it is not empty. these were
-        // chosen deliberately, so only the "it will not run" checks apply.
-        if (self.useCustomList) {
-            for (GameInfo* game in [AttractMode customList]) {
+        // a list the user picked in Settings. they chose these games deliberately, so
+        // only the "it will not run" checks apply, not the content filters.
+        GameList* list = self.sourceList;
+
+        if (list != nil) {
+            for (GameInfo* game in list.games) {
                 if (game.gameName.length != 0 && ![_badGames containsObject:game.gameName])
                     [_bag addObject:game];
             }
             if (_bag.count == 0)
-                AttractLog(@"MY LIST IS EMPTY, FALLING BACK TO RANDOM");
+                AttractLog(@"LIST \"%@\" IS EMPTY, FALLING BACK TO RANDOM", list.name);
         }
 
         for (GameInfo* game in (_bag.count == 0 ? _gameList : @[])) {

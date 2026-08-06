@@ -18,6 +18,7 @@
 #import "libmame.h"
 #import "Options.h"
 #import "AttractMode.h"
+#import "GameList.h"
 #import "UIView+Toast.h"
 
 #if TARGET_OS_IOS
@@ -170,6 +171,7 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     NSIndexPath* _currentlyFocusedIndexPath;
     UIImage* _loadingImage;
     NSCache* _system_description;
+    NSString* _listSignature;           // what the lists looked like when we last built sections
     AttractModeCell* _pinnedAttract;    // the preview when pinned to the top, else nil
     UIView* _pinnedAttractBackdrop;     // opaque fill behind it, so scrolled content cannot show through
     CGFloat _pinnedAttractHeight;       // how much top contentInset we added for it
@@ -430,9 +432,25 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     [self reloadAttractSection];
 }
 
-// add or remove the Attract Mode preview section to match the Settings switch. called
-// on appear, and directly by EmulatorController when Settings is dismissed (it is a
-// page sheet, so we never get a viewWillAppear for it).
+// what the lists contribute to the browser, so we can tell whether a trip through
+// Settings actually changed anything worth rebuilding for
+- (NSString*)listSignature
+{
+    NSMutableString* signature = [[NSMutableString alloc] init];
+
+    for (GameList* list in [GameList allLists])
+        [signature appendFormat:@"%@|%d|%d;", list.name, (int)list.count, (int)list.showInBrowser];
+
+    return signature;
+}
+
+// bring the Attract Mode preview and the list sections back in line with Settings.
+// called on appear, and directly by EmulatorController when Settings is dismissed
+// (it is a page sheet, so we never get a viewWillAppear for it).
+//
+// NOTE closing Settings normally restarts MAME and builds a whole new browser, which
+// would pick all this up for free - but that only happens when myosd_inGame is 0, and
+// the Attract Mode preview means it usually is not.
 - (void)reloadAttractSection
 {
     if (_isSearchResults || !self.isViewLoaded)
@@ -448,7 +466,12 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     [self setAttractPinned:pinned];
 
     // pinned lives in its own panel, so it must not also be a section
-    if ((enabled && !pinned) != [self isAttractSection:0])
+    BOOL attractChanged = (enabled && !pinned) != [self isAttractSection:0];
+    BOOL listsChanged = ![[self listSignature] isEqualToString:_listSignature];
+
+    // only rebuild when something moved - reloadData recreates the preview cell, which
+    // pauses and resumes the emulator
+    if (attractChanged || listsChanged)
         [self filterGameList];
 }
 
@@ -949,10 +972,23 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
             favoriteGames[i] = [[GameInfo alloc] initWithDictionary:favoriteGames[i]];
         [favoriteGames filterUsingPredicate:[NSPredicate predicateWithFormat:@"SELF IN %@", filteredGames]];
         
-        if ([favoriteGames count] > 0) {
+        if ([favoriteGames count] > 0 && [GameList favorites].showInBrowser) {
             //NSLog(@"FAVORITE GAMES: %@", favoriteGames);
             gameSectionTitles = [@[FAVORITE_GAMES_TITLE] arrayByAddingObjectsFromArray:gameSectionTitles];
             gameData[FAVORITE_GAMES_TITLE] = [favoriteGames copy];
+        }
+
+        // user lists that asked to be shown, above Favorites
+        for (GameList* list in [GameList allLists]) {
+            if (list.isFavorites || !list.showInBrowser)
+                continue;
+
+            NSArray* games = [list.games filteredArrayUsingPredicate:[NSPredicate predicateWithFormat:@"SELF IN %@", filteredGames]];
+            if (games.count == 0)
+                continue;
+
+            gameSectionTitles = [@[list.name] arrayByAddingObjectsFromArray:gameSectionTitles];
+            gameData[list.name] = games;
         }
 
         // load recent games and put them at the top
@@ -981,6 +1017,7 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     
     _gameSectionTitles = gameSectionTitles;
     _gameData = gameData;
+    _listSignature = [self listSignature];
 
     if (self.isViewLoaded) {
         [self reloadData];
@@ -2164,6 +2201,25 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
 }
 #endif
 
+// make a list and drop this game straight into it
+-(void)promptForNewListWithGame:(GameInfo*)game
+{
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"New List", @"")
+                                                                  message:nil
+                                                           preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField* field) {
+        field.placeholder = NSLocalizedString(@"List Name", @"");
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Create", @"") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+        GameList* list = [GameList createListNamed:alert.textFields.firstObject.text ?: @""];
+        [list addGame:game];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", @"") style:UIAlertActionStyleCancel handler:nil]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
 -(void)info:(GameInfo*)game
 {
     GameInfoController* gameInfoController = [[GameInfoController alloc] initWithGame:game];
@@ -2296,14 +2352,31 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
         ];
     }
     
-    // Attract Mode list
-    BOOL in_attract = [AttractMode isInCustomList:game];
-    NSString* attract_text = in_attract ? NSLocalizedString(@"Remove from Attract Mode",@"") : NSLocalizedString(@"Add to Attract Mode",@"");
-    NSString* attract_icon = in_attract ? @"play.slash" : @"play.rectangle";
+    // lists. Favorites has its own action above, with extras this one does not need.
+    for (GameList* list in [GameList allLists]) {
+        if (list.isFavorites)
+            continue;
+
+        BOOL in_list = [list containsGame:game];
+        NSString* text = [NSString stringWithFormat:in_list ? NSLocalizedString(@"Remove from %@",@"remove from a named list")
+                                                            : NSLocalizedString(@"Add to %@",@"add to a named list"), list.name];
+
+        actions = [actions arrayByAddingObject:
+            [UIAlertAction actionWithTitle:text symbol:(in_list ? @"minus.circle" : @"text.badge.plus") style:UIAlertActionStyleDefault handler:^(id action) {
+                if (in_list)
+                    [list removeGame:game];
+                else
+                    [list addGame:game];
+
+                if (list.showInBrowser)
+                    [self filterGameList];
+            }]
+        ];
+    }
 
     actions = [actions arrayByAddingObject:
-        [UIAlertAction actionWithTitle:attract_text symbol:attract_icon style:UIAlertActionStyleDefault handler:^(id action) {
-            [AttractMode setGame:game inCustomList:!in_attract];
+        [UIAlertAction actionWithTitle:NSLocalizedString(@"Add to New List…",@"") symbol:@"plus.rectangle.on.folder" style:UIAlertActionStyleDefault handler:^(id action) {
+            [self promptForNewListWithGame:game];
         }]
     ];
 

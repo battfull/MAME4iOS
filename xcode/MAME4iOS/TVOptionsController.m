@@ -12,6 +12,7 @@
 #import "CloudSync.h"
 #import "Alert.h"
 #import "AttractMode.h"
+#import "GameList.h"
 #import "MAME4iOS-Swift.h"
 
 @implementation TVOptionsController
@@ -40,8 +41,10 @@
 }
 
 - (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
-    if ( section == kAttractSection ) {
-        return 5;
+    if ( section == kListsSection ) {
+        return 1;
+    } else if ( section == kAttractSection ) {
+        return 4;
     } else if ( section == kFilterSection ) {
         return 3;
     } else if ( section == kScreenSection ) {
@@ -76,6 +79,9 @@
     }
     if ( section == kMiscSection ) {
         return @"Options";
+    }
+    if ( section == kListsSection ) {
+        return @"Lists";
     }
     if ( section == kAttractSection ) {
         return @"Attract Mode";
@@ -219,6 +225,10 @@
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.detailTextLabel.text = [Options.arraySoundValue localizedOptionAtIndex:op.soundValue];
         }
+    } else if ( indexPath.section == kListsSection ) {
+        cell.textLabel.text = @"Lists";
+        cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+        cell.detailTextLabel.text = [NSString stringWithFormat:@"%d", (int)[GameList allLists].count];
     } else if ( indexPath.section == kAttractSection ) {
         if ( indexPath.row == 0 ) {
             cell.textLabel.text = @"Attract Mode";
@@ -226,7 +236,7 @@
         } else if ( indexPath.row == 1 ) {
             cell.textLabel.text = @"Play Games From";
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            cell.detailTextLabel.text = [Options.arrayAttractSource localizedOptionAtIndex:op.attractSource];
+            cell.detailTextLabel.text = op.attractSource ?: ATTRACT_SOURCE_RANDOM;
         } else if ( indexPath.row == 2 ) {
             cell.textLabel.text = @"Hide Adult Games";
             cell.accessoryView = [self optionSwitchForKey:@"attractHideAdult"];
@@ -234,10 +244,6 @@
             cell.textLabel.text = @"Game Length";
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
-        } else if ( indexPath.row == 4 ) {
-            cell.textLabel.text = @"My Attract Mode List";
-            cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-            cell.detailTextLabel.text = [NSString stringWithFormat:@"%d", (int)[AttractMode customList].count];
         }
     } else if ( indexPath.section == kInputSection ) {
         cell.textLabel.text = @"Game Input";
@@ -319,9 +325,8 @@
             ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
             [[self navigationController] pushViewController:listController animated:YES];
         }
-        if ( indexPath.row == 4 ) {
-            [[self navigationController] pushViewController:[[AttractModeListController alloc] init] animated:YES];
-        }
+    } else if ( indexPath.section == kListsSection ) {
+        [[self navigationController] pushViewController:[[GameListsController alloc] init] animated:YES];
     } else if ( indexPath.section == kInputSection ) {
         TVInputOptionsController *inputController = [[TVInputOptionsController alloc] initWithEmuController:self.emuController];
         [self.navigationController pushViewController:inputController animated:YES];

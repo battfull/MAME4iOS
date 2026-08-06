@@ -210,6 +210,9 @@
 		EF1741D9261BB2D600DE8386 /* GameInfo.m in Sources */ = {isa = PBXBuildFile; fileRef = EF1741D5261BB2D600DE8386 /* GameInfo.m */; };
 		EF19F22C235D1BDF00C8EE7F /* ChooseGameController.m in Sources */ = {isa = PBXBuildFile; fileRef = EF19F229235D1BDF00C8EE7F /* ChooseGameController.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		A77AC7D00000000000000B01 /* AttractMode.m in Sources */ = {isa = PBXBuildFile; fileRef = A77AC7D00000000000000A02 /* AttractMode.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6A11157000000000000000B1 /* GameList.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A11157000000000000000A2 /* GameList.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6A11157000000000000000B2 /* GameList.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A11157000000000000000A2 /* GameList.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
+		6A11157000000000000000B3 /* GameList.m in Sources */ = {isa = PBXBuildFile; fileRef = 6A11157000000000000000A2 /* GameList.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		A77AC7D00000000000000B02 /* AttractMode.m in Sources */ = {isa = PBXBuildFile; fileRef = A77AC7D00000000000000A02 /* AttractMode.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		A77AC7D00000000000000B03 /* AttractMode.m in Sources */ = {isa = PBXBuildFile; fileRef = A77AC7D00000000000000A02 /* AttractMode.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
 		EF19F22D235D1BDF00C8EE7F /* ChooseGameController.m in Sources */ = {isa = PBXBuildFile; fileRef = EF19F229235D1BDF00C8EE7F /* ChooseGameController.m */; settings = {COMPILER_FLAGS = "-fobjc-arc"; }; };
@@ -552,6 +555,8 @@
 		EF19F229235D1BDF00C8EE7F /* ChooseGameController.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = ChooseGameController.m; sourceTree = "<group>"; };
 		A77AC7D00000000000000A01 /* AttractMode.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = AttractMode.h; sourceTree = "<group>"; };
 		A77AC7D00000000000000A02 /* AttractMode.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = AttractMode.m; sourceTree = "<group>"; };
+		6A11157000000000000000A1 /* GameList.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = GameList.h; sourceTree = "<group>"; };
+		6A11157000000000000000A2 /* GameList.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = GameList.m; sourceTree = "<group>"; };
 		EF19F22E235D1C0300C8EE7F /* ChooseGameController.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = ChooseGameController.h; sourceTree = "<group>"; };
 		EF1C93E124C252C400749C69 /* SKIN_1 */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SKIN_1; path = "../../iOS-res/SKIN_1"; sourceTree = "<group>"; };
 		EF1C93E324C252C400749C69 /* help.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; name = help.md; path = "../../iOS-res/help.md"; sourceTree = "<group>"; };
@@ -867,6 +872,8 @@
 				EF19F229235D1BDF00C8EE7F /* ChooseGameController.m */,
 				A77AC7D00000000000000A01 /* AttractMode.h */,
 				A77AC7D00000000000000A02 /* AttractMode.m */,
+				6A11157000000000000000A1 /* GameList.h */,
+				6A11157000000000000000A2 /* GameList.m */,
 				CEE680B41635BB4900051BC2 /* EmulatorController.h */,
 				CEE680B51635BB4900051BC2 /* EmulatorController.m */,
 				EF31447B27BB1E81002C3C6A /* ControllerButtonPress.swift */,
@@ -1512,6 +1519,7 @@
 				EFF9F82A2470755800DDA88C /* MetalScreenView.m in Sources */,
 				EF19F22C235D1BDF00C8EE7F /* ChooseGameController.m in Sources */,
 				A77AC7D00000000000000B01 /* AttractMode.m in Sources */,
+				6A11157000000000000000B1 /* GameList.m in Sources */,
 				EF926C9B24BA36980048392B /* SkinManager.m in Sources */,
 				92A533AE21EBDBAD0089FBB9 /* GCDWebServer.m in Sources */,
 				EF51444A282C5C68001457B1 /* GameInfo.swift in Sources */,
@@ -1546,6 +1554,7 @@
 				92ECB91921EAD57900D1E3D0 /* UIView+Toast.m in Sources */,
 				EF19F22D235D1BDF00C8EE7F /* ChooseGameController.m in Sources */,
 				A77AC7D00000000000000B02 /* AttractMode.m in Sources */,
+				6A11157000000000000000B2 /* GameList.m in Sources */,
 				928F7B2E27F0223100377C40 /* CommandLineArgsHelper.swift in Sources */,
 				92A533A621EBDBAD0089FBB9 /* GCDWebServerResponse.m in Sources */,
 				92A533D921EE601D0089FBB9 /* WebServer.m in Sources */,
@@ -1636,6 +1645,7 @@
 				92F623502C88D81A00E2579B /* MetalScreenView.m in Sources */,
 				92F623512C88D81A00E2579B /* ChooseGameController.m in Sources */,
 				A77AC7D00000000000000B03 /* AttractMode.m in Sources */,
+				6A11157000000000000000B3 /* GameList.m in Sources */,
 				92F623522C88D81A00E2579B /* SkinManager.m in Sources */,
 				92F623532C88D81A00E2579B /* GCDWebServer.m in Sources */,
 				92F623542C88D81A00E2579B /* GameInfo.swift in Sources */,

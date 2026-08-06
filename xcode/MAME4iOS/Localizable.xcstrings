@@ -429,13 +429,55 @@
       }
     },
     "⏭ Next" : {
-      "comment" : "Attract Mode next game button"
+      "comment" : "Attract Mode next game button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⏭ 次へ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "⏭ 下一个"
+          }
+        }
+      }
     },
     "▶ Play This Game" : {
-      "comment" : "Attract Mode keep playing button"
+      "comment" : "Attract Mode keep playing button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "▶ このゲームをプレイ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "▶ 玩这个游戏"
+          }
+        }
+      }
     },
     "◉ ATTRACT MODE" : {
-      "comment" : "Attract Mode badge"
+      "comment" : "Attract Mode badge",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ アトラクトモード"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "◉ 演示模式"
+          }
+        }
+      }
     },
     "⚠️Game might not run correctly." : {
       "localizations" : {
@@ -598,7 +640,21 @@
       }
     },
     "Ⓐ play · Ⓧ next · any other button to browse ROMs" : {
-      "comment" : "Attract Mode dismiss hint"
+      "comment" : "Attract Mode dismiss hint",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ⓐ プレイ · Ⓧ 次へ · その他のボタンでROM一覧へ"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ⓐ 玩 · Ⓧ 下一个 · 其他按钮浏览ROM"
+          }
+        }
+      }
     },
     "Add Arguments..." : {
       "localizations" : {
@@ -632,8 +688,22 @@
         }
       }
     },
-    "Add to Attract Mode" : {
-
+    "Add to %@" : {
+      "comment" : "add to a named list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@に追加"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到%@"
+          }
+        }
+      }
     },
     "Add to Favorites" : {
       "localizations" : {
@@ -647,6 +717,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加到收藏"
+          }
+        }
+      }
+    },
+    "Add to New List…" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規リストに追加…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加到新列表…"
           }
         }
       }
@@ -696,6 +782,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "动画"
+          }
+        }
+      }
+    },
+    "Another list already has it, or it is empty." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "その名前は既に使われているか、空です。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该名称已被其他列表使用，或为空。"
           }
         }
       }
@@ -790,7 +892,21 @@
       }
     },
     "Attract Mode" : {
-      "comment" : "Section header for Attract Mode settings\nSettings: Attract Mode Section: on/off"
+      "comment" : "Section header for Attract Mode settings\nSettings: Attract Mode Section: on/off",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アトラクトモード"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "演示模式"
+          }
+        }
+      }
     },
     "Auto" : {
       "localizations" : {
@@ -972,6 +1088,22 @@
         }
       }
     },
+    "Cannot Use That Name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この名前は使用できません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法使用该名称"
+          }
+        }
+      }
+    },
     "Change Current Layout" : {
       "localizations" : {
         "ja" : {
@@ -1089,6 +1221,22 @@
         }
       }
     },
+    "Create" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "作成"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "创建"
+          }
+        }
+      }
+    },
     "Dark Border" : {
       "comment" : "Dark Border",
       "extractionState" : "stale",
@@ -1154,6 +1302,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "删除"
+          }
+        }
+      }
+    },
+    "Delete “%@”?" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しますか？"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除“%@”？"
+          }
+        }
+      }
+    },
+    "Delete List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リストを削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除列表"
           }
         }
       }
@@ -1457,7 +1637,21 @@
       }
     },
     "Full Screen" : {
-      "comment" : "Attract Mode expand button"
+      "comment" : "Attract Mode expand button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フルスクリーン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "全屏"
+          }
+        }
+      }
     },
     "Fullscreen" : {
       "comment" : "Section header for fullscreen display options",
@@ -1594,7 +1788,37 @@
       }
     },
     "Game Length" : {
-      "comment" : "Settings: Attract Mode Section: how long each game plays"
+      "comment" : "Settings: Attract Mode Section: how long each game plays",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "1ゲームの再生時間"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每个游戏的时长"
+          }
+        }
+      }
+    },
+    "Games" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲーム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏"
+          }
+        }
+      }
     },
     "Genre" : {
       "comment" : "Genre scope",
@@ -1664,7 +1888,21 @@
       }
     },
     "Hide Adult Games" : {
-      "comment" : "Settings: Attract Mode Section: skip the Adult category when picking at random"
+      "comment" : "Settings: Attract Mode Section: skip the Adult category when picking at random",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アダルトゲームを非表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏成人游戏"
+          }
+        }
+      }
     },
     "Hide BIOS" : {
       "comment" : "Filter option to hide BIOS files from the list",
@@ -1919,6 +2157,39 @@
         }
       }
     },
+    "List Name" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト名"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表名称"
+          }
+        }
+      }
+    },
+    "Lists" : {
+      "comment" : "Section header for game lists\nSettings: Lists section row\nSettings: the Lists screen",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表"
+          }
+        }
+      }
+    },
     "Load" : {
       "comment" : "HUD Load",
       "localizations" : {
@@ -1936,8 +2207,21 @@
         }
       }
     },
-    "Long press a game in the ROM list and choose Add to Attract Mode." : {
-      "comment" : "Attract Mode empty list hint"
+    "Long press a game in the ROM list to add it." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ROM一覧でゲームを長押しすると追加できます。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在ROM列表中长按游戏即可添加。"
+          }
+        }
+      }
     },
     "Make First Favorite" : {
       "localizations" : {
@@ -2041,8 +2325,22 @@
         }
       }
     },
-    "My Attract Mode List" : {
-      "comment" : "Attract Mode custom list screen\nSettings: Attract Mode Section: edit the custom list"
+    "My List" : {
+      "comment" : "name given to the pre-Lists Attract Mode list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "マイリスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "我的列表"
+          }
+        }
+      }
     },
     "Nearest" : {
       "comment" : "Nearest",
@@ -2062,8 +2360,55 @@
         }
       }
     },
+    "New List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規リスト"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建列表"
+          }
+        }
+      }
+    },
+    "New List…" : {
+      "comment" : "Settings: create a list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規リスト…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新建列表…"
+          }
+        }
+      }
+    },
     "Next Game" : {
-      "comment" : "Attract Mode next game button"
+      "comment" : "Attract Mode next game button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "次のゲーム"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下一个游戏"
+          }
+        }
+      }
     },
     "Nintendo Button Layout" : {
       "localizations" : {
@@ -2099,7 +2444,21 @@
       }
     },
     "No games yet" : {
-      "comment" : "Attract Mode empty list"
+      "comment" : "Attract Mode empty list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームがありません"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "还没有游戏"
+          }
+        }
+      }
     },
     "No Shadow Mask but Blurred" : {
       "comment" : "No Shadow Mask but Blurred",
@@ -2153,7 +2512,6 @@
     },
     "Off" : {
       "comment" : "Off",
-      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -2165,6 +2523,38 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "关"
+          }
+        }
+      }
+    },
+    "Ok" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "好"
+          }
+        }
+      }
+    },
+    "On" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "オン"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "开"
           }
         }
       }
@@ -2342,7 +2732,21 @@
       }
     },
     "Pin Attract Mode" : {
-      "comment" : "Attract Mode pin button"
+      "comment" : "Attract Mode pin button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アトラクトモードを固定"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "固定演示模式"
+          }
+        }
+      }
     },
     "Play" : {
       "localizations" : {
@@ -2361,7 +2765,21 @@
       }
     },
     "Play Games From" : {
-      "comment" : "Settings: Attract Mode Section: random or the user's list"
+      "comment" : "Settings: Attract Mode Section: random or the user's list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲームの再生元"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏来源"
+          }
+        }
+      }
     },
     "Play With..." : {
       "localizations" : {
@@ -2446,8 +2864,22 @@
         }
       }
     },
-    "Remove from Attract Mode" : {
-
+    "Remove from %@" : {
+      "comment" : "remove from a named list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@から削除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "从%@移除"
+          }
+        }
+      }
     },
     "Remove from Favorites" : {
       "localizations" : {
@@ -2477,6 +2909,55 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "从最近游玩移除"
+          }
+        }
+      }
+    },
+    "Rename" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前を変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名"
+          }
+        }
+      }
+    },
+    "Rename List" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト名を変更"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名列表"
+          }
+        }
+      }
+    },
+    "Rename List…" : {
+      "comment" : "Settings: rename a list",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト名を変更…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重命名列表…"
           }
         }
       }
@@ -2728,6 +3209,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示 HUD"
+          }
+        }
+      }
+    },
+    "Show in ROM Browser" : {
+      "comment" : "Settings: show this list as a section",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ROM一覧に表示"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在ROM浏览器中显示"
           }
         }
       }
@@ -3095,7 +3593,37 @@
       }
     },
     "Tap anywhere to browse ROMs" : {
-      "comment" : "Attract Mode dismiss hint"
+      "comment" : "Attract Mode dismiss hint",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面をタップするとROM一覧に戻ります"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按任意位置浏览ROM"
+          }
+        }
+      }
+    },
+    "The games themselves are not affected." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲーム自体は削除されません。"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "游戏本身不会受到影响。"
+          }
+        }
+      }
     },
     "To transfer ROMs from your computer go to one of these addresses in your web browser:\n\n%@" : {
       "localizations" : {
@@ -3353,7 +3881,21 @@
       }
     },
     "Unpin Attract Mode" : {
-      "comment" : "Attract Mode unpin button"
+      "comment" : "Attract Mode unpin button",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アトラクトモードの固定を解除"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "取消固定演示模式"
+          }
+        }
+      }
     },
     "Use as Title Image" : {
       "localizations" : {

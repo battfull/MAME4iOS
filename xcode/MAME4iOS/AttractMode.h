@@ -35,13 +35,6 @@ void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 // section title (and NSUserDefaults-visible name) for the inline preview
 #define ATTRACT_SECTION_TITLE   @"Attract Mode"
 
-// NSUserDefaults key for the user's hand picked Attract Mode games
-#define ATTRACT_LIST_KEY        @"AttractModeGames"
-
-// a table of the user's Attract Mode list, with delete. pushed from Settings.
-@interface AttractModeListController : UITableViewController
-@end
-
 @interface AttractMode : NSObject
 
 @property (class, nonatomic, readonly) AttractMode* shared;
@@ -61,12 +54,6 @@ void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 
 // the pool of games to draw from, handed over by ChooseGameController
 - (void)setGameList:(NSArray<GameInfo*>*)games;
-
-// the user's hand picked list, used instead of a random draw when Settings says so.
-// stored the same way as Favorites, an array of gameDictionary in NSUserDefaults.
-+ (NSArray<GameInfo*>*)customList;
-+ (BOOL)isInCustomList:(GameInfo*)game;
-+ (void)setGame:(GameInfo*)game inCustomList:(BOOL)flag;
 
 // pinned means the preview sits at the top of the ROM browser instead of scrolling
 // with it, so it never scrolls out of view and never pauses

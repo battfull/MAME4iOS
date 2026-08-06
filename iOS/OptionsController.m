@@ -51,6 +51,7 @@
 #import "EmulatorController.h"
 #import "ImageCache.h"
 #import "AttractMode.h"
+#import "GameList.h"
 
 #if !TARGET_APPSTORE
 #import "CloudSync.h"
@@ -288,6 +289,13 @@
             }
             break;   
         }
+       case kListsSection:
+       {
+           cell.textLabel.text = NSLocalizedString(@"Lists", @"Settings: Lists section row");
+           cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
+           cell.detailTextLabel.text = [NSString stringWithFormat:@"%d", (int)[GameList allLists].count];
+           break;
+       }
        case kAttractSection:
        {
            switch (indexPath.row)
@@ -302,7 +310,7 @@
                {
                    cell.textLabel.text = NSLocalizedString(@"Play Games From", @"Settings: Attract Mode Section: random or the user's list");
                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-                   cell.detailTextLabel.text = [Options.arrayAttractSource localizedOptionAtIndex:op.attractSource];
+                   cell.detailTextLabel.text = NSLocalizedString(op.attractSource ?: ATTRACT_SOURCE_RANDOM, @"");
                    break;
                }
                case 2:
@@ -318,13 +326,7 @@
                    cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
                    break;
                }
-               case 4:
-               {
-                   cell.textLabel.text = NSLocalizedString(@"My Attract Mode List", @"Settings: Attract Mode Section: edit the custom list");
-                   cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
-                   cell.detailTextLabel.text = [NSString stringWithFormat:@"%d", (int)[AttractMode customList].count];
-                   break;
-               }
+
            }
            break;
        }
@@ -495,6 +497,7 @@
       case kVideoSection: return NSLocalizedString(@"Video Options", @"Section header for video display settings");
       case kVectorSection: return NSLocalizedString(@"Vector Options", @"Section header for vector graphics settings");
       case kMiscSection: return NSLocalizedString(@"Options", @"Section header for miscellaneous settings");
+      case kListsSection: return NSLocalizedString(@"Lists", @"Section header for game lists");
       case kAttractSection: return NSLocalizedString(@"Attract Mode", @"Section header for Attract Mode settings");
       case kFilterSection: return NSLocalizedString(@"Game Filter", @"Section header for game filtering options");
       case kOtherSection: return @""; // @"Other";
@@ -524,7 +527,8 @@
           case kVideoSection: return 7;
           case kVectorSection: return 2;
           case kMiscSection: return 9;
-          case kAttractSection: return 5;
+          case kListsSection: return 1;
+          case kAttractSection: return 4;
           case kFilterSection: return 3;
           case kImportSection: return 4;
 #if !TARGET_APPSTORE
@@ -604,6 +608,11 @@
             }
             break;
         }
+        case kListsSection:
+        {
+            [[self navigationController] pushViewController:[[GameListsController alloc] init] animated:YES];
+            break;
+        }
         case kAttractSection:
         {
             if (row==1) {
@@ -613,9 +622,6 @@
             if (row==3) {
                 ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
                 [[self navigationController] pushViewController:listController animated:YES];
-            }
-            if (row==4) {
-                [[self navigationController] pushViewController:[[AttractModeListController alloc] init] animated:YES];
             }
             break;
         }

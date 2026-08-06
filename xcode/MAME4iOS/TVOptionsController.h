@@ -20,6 +20,7 @@ enum OptionSections
     kScreenSection,
     kVectorSection,
     kMiscSection,
+    kListsSection,
     kAttractSection,
     kFilterSection,
     kBenchmarkSection,

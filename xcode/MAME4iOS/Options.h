@@ -25,7 +25,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (class, readonly, strong) NSArray* arrayEmuSpeed;
 @property (class, readonly, strong) NSArray* arrayAttractDuration;
+// Random followed by every list, rebuilt each time since lists come and go
 @property (class, readonly, strong) NSArray* arrayAttractSource;
+#define ATTRACT_SOURCE_RANDOM   @"Random"
 @property (class, readonly, strong) NSArray* arrayControlType;
 @property (class, readonly, strong) NSArray* arraySoundValue;
 @property (class, readonly, strong) NSArray* arraySkin;
@@ -109,7 +111,8 @@ NS_ASSUME_NONNULL_BEGIN
 // Attract Mode: on/off, where it draws games from (index into arrayAttractSource),
 // and how long each game plays (index into arrayAttractDuration)
 @property (readwrite,assign) int attractMode;
-@property (readwrite,assign) int attractSource;
+// where Attract Mode draws games from - ATTRACT_SOURCE_RANDOM or a GameList name
+@property (readwrite,strong) NSString* attractSource;
 @property (readwrite,assign) int attractDuration;
 
 // skip games in the Adult category when Attract Mode picks at random
