@@ -43,10 +43,13 @@
 
 #define CELL_IDENTIFIER   @"GameInfoCell"
 #define ATTRACT_CELL_IDENTIFIER @"AttractModeCell"
+#define LOADING_VIEW_TAG        0x10AD
 // preview cell = 16:9 screen + this much for the countdown line and buttons
 #define ATTRACT_CELL_CHROME_HEIGHT (TARGET_OS_IOS ? 48.0 : 72.0)
-// never let the preview eat more of the screen than this, matters in landscape
-#define ATTRACT_MAX_HEIGHT_FRACTION 0.4
+// how much of the screen the preview may take. landscape is short, and a 16:9 box at
+// full width would be capped down to a letterbox slot, so it gets a bigger share.
+#define ATTRACT_MAX_HEIGHT_PORTRAIT   0.4
+#define ATTRACT_MAX_HEIGHT_LANDSCAPE  0.78
 #define HEADER_IDENTIFIER   @"GameInfoHeader"
 
 #if (TARGET_OS_IOS && !TARGET_OS_MACCATALYST)
@@ -422,6 +425,11 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         // lays out immediately and would recurse if we did it mid layout pass.
         [self setAttractPinned:NO];
         [self reloadAttractSection];
+
+        // and once the collection view has re-laid out at the new size, put the game
+        // back in the middle of whatever container it ended up in
+        [self.view layoutIfNeeded];
+        [AttractMode.shared refitPreview];
     }];
 }
 
@@ -475,6 +483,12 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         [self filterGameList];
 }
 
+- (CGFloat)attractMaxHeightFraction
+{
+    BOOL landscape = self.view.bounds.size.width > self.view.bounds.size.height;
+    return landscape ? ATTRACT_MAX_HEIGHT_LANDSCAPE : ATTRACT_MAX_HEIGHT_PORTRAIT;
+}
+
 // vertically compact is iPhone landscape - iPad and Mac keep their room, so they can
 // still pin in either orientation.
 - (BOOL)canPinAttract
@@ -507,7 +521,7 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
     // never taller than a chunk of the screen, the ROM list still has to be usable
     CGFloat width = self.view.bounds.size.width - (SECTION_INSET_X * 2);
     CGFloat height = MIN(floor(width * 9.0 / 16.0) + ATTRACT_CELL_CHROME_HEIGHT,
-                         floor(self.view.bounds.size.height * ATTRACT_MAX_HEIGHT_FRACTION));
+                         floor(self.view.bounds.size.height * [self attractMaxHeightFraction]));
 
     // contentInset only decides where the list *rests*, it still scrolls underneath,
     // so the pinned area needs something opaque behind it. the backdrop runs all the
@@ -1387,12 +1401,65 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
 - (NSInteger)numberOfSectionsInCollectionView:(UICollectionView *)collectionView
 {
   NSInteger count =  [_gameSectionTitles count];
+
+  // building the list takes a moment on a big collection, and until it lands we have
+  // no idea whether there are any ROMs - dont accuse the user of having none
+  if (_gameList == nil) {
+    [self showLoadingState];
+    return count;
+  }
+
+  [self hideLoadingState];
+
   if (count == 0) {
     [self.collectionView showZeroState];
   } else {
     self.collectionView.backgroundView = nil;
   }
   return count;
+}
+
+- (void)showLoadingState
+{
+    if (self.collectionView.backgroundView != nil)
+        return;
+
+    UIActivityIndicatorViewStyle style;
+    if (@available(iOS 13.0, tvOS 13.0, *))
+        style = UIActivityIndicatorViewStyleLarge;
+    else
+        style = UIActivityIndicatorViewStyleWhiteLarge;
+
+    UIActivityIndicatorView* spinner = [[UIActivityIndicatorView alloc] initWithActivityIndicatorStyle:style];
+    spinner.color = UIColor.whiteColor;
+    [spinner startAnimating];
+
+    UILabel* label = [[UILabel alloc] init];
+    label.text = NSLocalizedString(@"Loading…", @"shown while the ROM list is being built");
+    label.font = [UIFont preferredFontForTextStyle:UIFontTextStyleBody];
+    label.textColor = [UIColor colorWithWhite:1.0 alpha:0.6];
+
+    UIStackView* stack = [[UIStackView alloc] initWithArrangedSubviews:@[spinner, label]];
+    stack.axis = UILayoutConstraintAxisVertical;
+    stack.alignment = UIStackViewAlignmentCenter;
+    stack.spacing = 12.0;
+    stack.translatesAutoresizingMaskIntoConstraints = NO;
+
+    UIView* background = [[UIView alloc] init];
+    background.tag = LOADING_VIEW_TAG;
+    [background addSubview:stack];
+    [NSLayoutConstraint activateConstraints:@[
+        [stack.centerXAnchor constraintEqualToAnchor:background.centerXAnchor],
+        [stack.centerYAnchor constraintEqualToAnchor:background.centerYAnchor],
+    ]];
+
+    self.collectionView.backgroundView = background;
+}
+
+- (void)hideLoadingState
+{
+    if (self.collectionView.backgroundView.tag == LOADING_VIEW_TAG)
+        self.collectionView.backgroundView = nil;
 }
 - (NSInteger)collectionView:(UICollectionView *)collectionView numberOfItemsInSection:(NSInteger)section
 {
@@ -1689,10 +1756,10 @@ typedef NS_ENUM(NSInteger, LayoutMode) {
         width -= (collectionView.adjustedContentInset.left + collectionView.adjustedContentInset.right);
         width = MAX(width, 1.0);
 
-        // 16:9 at full width is over half the screen in landscape, which leaves no room
-        // to browse. cap it and let the game letterbox inside the container.
+        // 16:9 at full width is taller than the screen in landscape, so the cap does the
+        // real work there - the game letterboxes inside whatever we allow it.
         CGFloat height = MIN(floor(width * 9.0 / 16.0) + ATTRACT_CELL_CHROME_HEIGHT,
-                             floor(collectionView.bounds.size.height * ATTRACT_MAX_HEIGHT_FRACTION));
+                             floor(self.view.bounds.size.height * [self attractMaxHeightFraction]));
         return CGSizeMake(width, MAX(height, ATTRACT_CELL_CHROME_HEIGHT + 1.0));
     }
 
@@ -2201,23 +2268,27 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
 }
 #endif
 
-// make a list and drop this game straight into it
--(void)promptForNewListWithGame:(GameInfo*)game
+// every list with a tick against the ones this game is already in. a presented
+// controller rather than an action sheet, so ticking one does not close it.
+-(void)showListPickerForGame:(GameInfo*)game atIndexPath:(NSIndexPath*)indexPath
 {
-    UIAlertController* alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"New List", @"")
-                                                                  message:nil
-                                                           preferredStyle:UIAlertControllerStyleAlert];
-    [alert addTextFieldWithConfigurationHandler:^(UITextField* field) {
-        field.placeholder = NSLocalizedString(@"List Name", @"");
-    }];
+    GameListPickerController* picker = [[GameListPickerController alloc] initWithGame:game];
 
-    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Create", @"") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
-        GameList* list = [GameList createListNamed:alert.textFields.firstObject.text ?: @""];
-        [list addGame:game];
-    }]];
-    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", @"") style:UIAlertActionStyleCancel handler:nil]];
+    __weak ChooseGameController* _self = self;
+    picker.didFinish = ^{
+        // reloadAttractSection compares a signature of the lists, so this only rebuilds
+        // the collection view if something actually changed
+        [_self reloadAttractSection];
+    };
 
-    [self presentViewController:alert animated:YES completion:nil];
+    UINavigationController* nav = [[UINavigationController alloc] initWithRootViewController:picker];
+#if TARGET_OS_IOS
+    nav.modalPresentationStyle = UIModalPresentationFormSheet;
+#endif
+    if (@available(iOS 13.0, tvOS 13.0, *))
+        nav.overrideUserInterfaceStyle = UIUserInterfaceStyleDark;
+
+    [self presentViewController:nav animated:YES completion:nil];
 }
 
 -(void)info:(GameInfo*)game
@@ -2352,31 +2423,13 @@ NSAttributedString* attributedString(NSString* text, UIFont* font, UIColor* colo
         ];
     }
     
-    // lists. Favorites has its own action above, with extras this one does not need.
-    for (GameList* list in [GameList allLists]) {
-        if (list.isFavorites)
-            continue;
-
-        BOOL in_list = [list containsGame:game];
-        NSString* text = [NSString stringWithFormat:in_list ? NSLocalizedString(@"Remove from %@",@"remove from a named list")
-                                                            : NSLocalizedString(@"Add to %@",@"add to a named list"), list.name];
-
-        actions = [actions arrayByAddingObject:
-            [UIAlertAction actionWithTitle:text symbol:(in_list ? @"minus.circle" : @"text.badge.plus") style:UIAlertActionStyleDefault handler:^(id action) {
-                if (in_list)
-                    [list removeGame:game];
-                else
-                    [list addGame:game];
-
-                if (list.showInBrowser)
-                    [self filterGameList];
-            }]
-        ];
-    }
-
+    // one entry point into the lists rather than a row each - a game in five lists
+    // would otherwise bury the rest of the menu under five of them. the picker creates
+    // lists too, so it is offered even before there are any. Favorites has its own
+    // action above, with extras the picker does not need.
     actions = [actions arrayByAddingObject:
-        [UIAlertAction actionWithTitle:NSLocalizedString(@"Add to New List…",@"") symbol:@"plus.rectangle.on.folder" style:UIAlertActionStyleDefault handler:^(id action) {
-            [self promptForNewListWithGame:game];
+        [UIAlertAction actionWithTitle:NSLocalizedString(@"Lists…",@"open the list picker for a game") symbol:@"list.bullet" style:UIAlertActionStyleDefault handler:^(id action) {
+            [self showListPickerForGame:game atIndexPath:indexPath];
         }]
     ];
 

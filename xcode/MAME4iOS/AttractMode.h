@@ -68,6 +68,11 @@ void AttractLog(NSString* format, ...) NS_FORMAT_FUNCTION(1,2);
 // the emulator has to re-fit itself to it
 - (void)previewContainerDidResize:(AttractModeCell*)cell;
 
+// re-fit the preview to its container right now. the layout passes during a rotation
+// interleave differently depending on which way you turn, so the browser calls this
+// once everything has settled rather than trusting them.
+- (void)refitPreview;
+
 // drivers MAME flagged NOT_WORKING - these greet you with a red error screen, so they
 // never make it into Attract Mode even when the user is not filtering them out
 - (void)setNotWorkingGameNames:(NSSet<NSString*>*)names;

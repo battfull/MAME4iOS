@@ -115,8 +115,6 @@ NS_ASSUME_NONNULL_BEGIN
 @property (readwrite,strong) NSString* attractSource;
 @property (readwrite,assign) int attractDuration;
 
-// skip games in the Adult category when Attract Mode picks at random
-@property (readwrite,assign) int attractHideAdult;
 
 // keep the Attract Mode preview stuck to the top of the ROM browser
 @property (readwrite,assign) int attractPinned;

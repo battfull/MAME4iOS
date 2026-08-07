@@ -26,6 +26,8 @@
 #define ATTRACT_RETRY_DELAY     2.0
 // how long to let a machine finish booting before we skip away from it, see -skipSoon
 #define ATTRACT_SKIP_DELAY      1.5
+// how long the preview takes to grow into the whole screen
+#define ATTRACT_ZOOM_DURATION   0.35
 // how long the chrome stays at full strength before fading back to let the game show
 #define ATTRACT_DIM_DELAY       4.0
 #define ATTRACT_DIM_ALPHA       0.6
@@ -36,8 +38,6 @@
 
 // categories (from Category.ini) that make for a lousy demo
 #define ATTRACT_SKIP_CATEGORIES @[@"Electromechanical", @"Mechanical", @"Utilities", @"Casino"]
-// Category.ini files this app ships put grown up games (a lot of mahjong) under [Adult]
-#define ATTRACT_ADULT_CATEGORY  @"Adult"
 
 #define OVERLAY_INSET           16.0
 #define OVERLAY_CORNER_RADIUS   14.0
@@ -79,11 +79,15 @@ void AttractLog(NSString* format, ...)
 @property (nonatomic, strong) UILabel* detailLabel;
 @property (nonatomic, strong) UIButton* playButton;
 @property (nonatomic, strong) UIButton* nextButton;
+@property (nonatomic, strong) UIButton* favoriteButton;
+@property (nonatomic, strong) GameInfo* game;
 - (void)startProgress:(NSTimeInterval)remaining of:(NSTimeInterval)total;
+- (void)updateFavoriteButton;
 @end
 
 @implementation AttractModeOverlayView
 {
+    UIView* _progressTrack;
     UIView* _progressFill;
     NSLayoutConstraint* _progressWidth;
 }
@@ -108,31 +112,29 @@ void AttractLog(NSString* format, ...)
     return self;
 }
 
-// a thin line across the very top counting down this game's turn. it lives outside
-// the chrome so it stays readable after everything else fades back.
+// the countdown line, built here but positioned in -buildChrome so it can sit just
+// above the info row, the same place the browser cell puts it. it lives outside the
+// chrome view so it stays readable after everything else fades back.
 - (void)buildProgressBar
 {
-    UIView* track = [[UIView alloc] init];
-    track.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.15];
-    track.translatesAutoresizingMaskIntoConstraints = NO;
-    [self addSubview:track];
+    _progressTrack = [[UIView alloc] init];
+    _progressTrack.backgroundColor = [UIColor colorWithWhite:1.0 alpha:0.15];
+    _progressTrack.translatesAutoresizingMaskIntoConstraints = NO;
+    [self addSubview:_progressTrack];
 
     _progressFill = [[UIView alloc] init];
     _progressFill.backgroundColor = self.tintColor;
     _progressFill.translatesAutoresizingMaskIntoConstraints = NO;
-    [track addSubview:_progressFill];
+    [_progressTrack addSubview:_progressFill];
 
     _progressWidth = [_progressFill.widthAnchor constraintEqualToConstant:0.0];
 
     [NSLayoutConstraint activateConstraints:@[
-        [track.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
-        [track.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
-        [track.topAnchor constraintEqualToAnchor:self.topAnchor],
-        [track.heightAnchor constraintEqualToConstant:PROGRESS_HEIGHT],
+        [_progressTrack.heightAnchor constraintEqualToConstant:PROGRESS_HEIGHT],
 
-        [_progressFill.leadingAnchor constraintEqualToAnchor:track.leadingAnchor],
-        [_progressFill.topAnchor constraintEqualToAnchor:track.topAnchor],
-        [_progressFill.bottomAnchor constraintEqualToAnchor:track.bottomAnchor],
+        [_progressFill.leadingAnchor constraintEqualToAnchor:_progressTrack.leadingAnchor],
+        [_progressFill.topAnchor constraintEqualToAnchor:_progressTrack.topAnchor],
+        [_progressFill.bottomAnchor constraintEqualToAnchor:_progressTrack.bottomAnchor],
         _progressWidth,
     ]];
 }
@@ -161,18 +163,21 @@ void AttractLog(NSString* format, ...)
     hint.font = [UIFont systemFontOfSize:TARGET_OS_IOS ? 12.0 : 20.0];
     hint.textColor = [UIColor colorWithWhite:1.0 alpha:0.65];
 
-    UIStackView* topStack = [[UIStackView alloc] initWithArrangedSubviews:@[badgeBox, hint]];
-    topStack.axis = UILayoutConstraintAxisVertical;
-    topStack.alignment = UIStackViewAlignmentLeading;
-    topStack.spacing = 6.0;
-    topStack.translatesAutoresizingMaskIntoConstraints = NO;
-    [_chromeView addSubview:topStack];
+    // badge and hint read as one line, tucked just above the countdown
+    UIStackView* attractRow = [[UIStackView alloc] initWithArrangedSubviews:@[badgeBox, hint]];
+    attractRow.axis = UILayoutConstraintAxisHorizontal;
+    attractRow.alignment = UIStackViewAlignmentCenter;
+    attractRow.spacing = 8.0;
+    attractRow.translatesAutoresizingMaskIntoConstraints = NO;
+    [_chromeView addSubview:attractRow];
 
     // game info card, bottom leading
     _titleLabel = [[UILabel alloc] init];
     _titleLabel.font = [UIFont boldSystemFontOfSize:TARGET_OS_IOS ? 20.0 : 32.0];
     _titleLabel.textColor = UIColor.whiteColor;
-    _titleLabel.numberOfLines = 2;
+    _titleLabel.numberOfLines = 1;
+    _titleLabel.adjustsFontSizeToFitWidth = YES;
+    _titleLabel.minimumScaleFactor = 0.7;
 
     _detailLabel = [[UILabel alloc] init];
     _detailLabel.font = [UIFont systemFontOfSize:TARGET_OS_IOS ? 13.0 : 22.0];
@@ -186,16 +191,25 @@ void AttractLog(NSString* format, ...)
 
     UIView* card = [self makeBoxWithContent:cardStack insets:UIEdgeInsetsMake(10, 14, 10, 14)];
 
-    // the two things that are not "stop the demo"
-    _nextButton = [self makePillButton:NSLocalizedString(@"⏭ Next", @"Attract Mode next game button")
-                            background:[UIColor colorWithWhite:1.0 alpha:0.2]];
+    // the things that are not "stop the demo". favorite and next are borderless
+    // symbols, matching the browser cell; keeping this game stays a proper button.
+    _favoriteButton = [self makeSymbolButton:@"heart"];
+    [_favoriteButton addTarget:self action:@selector(favoriteTapped) forControlEvents:UIControlEventTouchUpInside];
+
+    _nextButton = [self makeSymbolButton:@"forward.end.fill"];
+    _nextButton.accessibilityLabel = NSLocalizedString(@"Next Game", @"Attract Mode next game button");
+
     _playButton = [self makePillButton:NSLocalizedString(@"▶ Play This Game", @"Attract Mode keep playing button")
                             background:self.tintColor];
 
-    UIStackView* bottomStack = [[UIStackView alloc] initWithArrangedSubviews:@[card, _nextButton, _playButton]];
+    // what is playing goes at the very top, where the eye lands first
+    card.translatesAutoresizingMaskIntoConstraints = NO;
+    [_chromeView addSubview:card];
+
+    UIStackView* bottomStack = [[UIStackView alloc] initWithArrangedSubviews:@[_favoriteButton, _nextButton, [self makeSpacer], _playButton]];
     bottomStack.axis = UILayoutConstraintAxisHorizontal;
     bottomStack.alignment = UIStackViewAlignmentCenter;
-    bottomStack.spacing = 10.0;
+    bottomStack.spacing = 8.0;
     bottomStack.translatesAutoresizingMaskIntoConstraints = NO;
     [_chromeView addSubview:bottomStack];
 
@@ -206,14 +220,80 @@ void AttractLog(NSString* format, ...)
         [_chromeView.topAnchor constraintEqualToAnchor:self.topAnchor],
         [_chromeView.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
 
-        [topStack.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:OVERLAY_INSET],
-        [topStack.topAnchor constraintEqualToAnchor:safe.topAnchor constant:OVERLAY_INSET],
-        [topStack.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
+        [card.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:OVERLAY_INSET],
+        [card.topAnchor constraintEqualToAnchor:safe.topAnchor constant:OVERLAY_INSET],
+        [card.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
+
+        [attractRow.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:OVERLAY_INSET],
+        [attractRow.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
+        [attractRow.bottomAnchor constraintEqualToAnchor:_progressTrack.topAnchor constant:-8.0],
+
+        [_progressTrack.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:OVERLAY_INSET],
+        [_progressTrack.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
+        [_progressTrack.bottomAnchor constraintEqualToAnchor:bottomStack.topAnchor constant:-8.0],
 
         [bottomStack.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:OVERLAY_INSET],
-        [bottomStack.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
+        [bottomStack.trailingAnchor constraintEqualToAnchor:safe.trailingAnchor constant:-OVERLAY_INSET],
         [bottomStack.bottomAnchor constraintEqualToAnchor:safe.bottomAnchor constant:-OVERLAY_INSET],
     ]];
+}
+
+// borderless, over the picture - the same treatment the browser cell's corner
+// buttons get, so the two screens read as one thing
+// an empty view that soaks up the slack in a row, pushing what follows to the far end
+- (UIView*)makeSpacer
+{
+    UIView* spacer = [[UIView alloc] init];
+    [spacer setContentHuggingPriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+    [spacer setContentCompressionResistancePriority:UILayoutPriorityDefaultLow forAxis:UILayoutConstraintAxisHorizontal];
+    return spacer;
+}
+
+- (UIButton*)makeSymbolButton:(NSString*)symbol
+{
+    UIButton* button = [UIButton buttonWithType:UIButtonTypeSystem];
+    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:TARGET_OS_IOS ? 20.0 : 30.0];
+
+    [button setImage:[UIImage systemImageNamed:symbol withConfiguration:config] forState:UIControlStateNormal];
+    button.tintColor = UIColor.whiteColor;
+    button.layer.shadowColor = UIColor.blackColor.CGColor;
+    button.layer.shadowOpacity = 0.8;
+    button.layer.shadowRadius = 3.0;
+    button.layer.shadowOffset = CGSizeZero;
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wdeprecated"
+    button.contentEdgeInsets = UIEdgeInsetsMake(8, 10, 8, 10);
+    #pragma clang diagnostic pop
+    [button setContentCompressionResistancePriority:UILayoutPriorityRequired forAxis:UILayoutConstraintAxisHorizontal];
+
+    return button;
+}
+
+- (void)setGame:(GameInfo*)game
+{
+    _game = game;
+    [self updateFavoriteButton];
+}
+
+- (void)updateFavoriteButton
+{
+    BOOL favorite = _game != nil && [ChooseGameController isFavorite:_game];
+    UIImageSymbolConfiguration* config = [UIImageSymbolConfiguration configurationWithPointSize:TARGET_OS_IOS ? 20.0 : 30.0];
+
+    [_favoriteButton setImage:[UIImage systemImageNamed:(favorite ? @"heart.fill" : @"heart") withConfiguration:config] forState:UIControlStateNormal];
+    _favoriteButton.tintColor = favorite ? UIColor.systemRedColor : UIColor.whiteColor;
+    _favoriteButton.hidden = (_game == nil);
+    _favoriteButton.accessibilityLabel = favorite ? NSLocalizedString(@"Remove from Favorites", @"")
+                                                  : NSLocalizedString(@"Add to Favorites", @"");
+}
+
+- (void)favoriteTapped
+{
+    if (_game == nil)
+        return;
+
+    [ChooseGameController setFavorite:_game isFavorite:![ChooseGameController isFavorite:_game]];
+    [self updateFavoriteButton];
 }
 
 - (UIButton*)makePillButton:(NSString*)title background:(UIColor*)color
@@ -258,7 +338,7 @@ void AttractLog(NSString* format, ...)
 {
     [_progressFill.layer removeAllAnimations];
 
-    _progressWidth.constant = self.bounds.size.width * (total > 0.0 ? MIN(remaining / total, 1.0) : 1.0);
+    _progressWidth.constant = _progressTrack.bounds.size.width * (total > 0.0 ? MIN(remaining / total, 1.0) : 1.0);
     [self layoutIfNeeded];
 
     _progressWidth.constant = 0.0;
@@ -575,6 +655,7 @@ void AttractLog(NSString* format, ...)
     NSTimer* _dimTimer;
     AttractModeOverlayView* _overlay;
     AttractModeCell* _inlineCell;   // the browser cell we are previewing into, or nil
+    UIView* _zoomView;              // full screen render target the preview grew into
     BOOL _fullScreen;               // TRUE once we have taken over the whole screen
     BOOL _paused;                   // TRUE while the preview is scrolled out of view
     NSTimeInterval _pausedRemaining;// seconds left in this game's turn when we paused
@@ -656,9 +737,24 @@ void AttractLog(NSString* format, ...)
     [_inlineCell updatePinButton];
 }
 
+- (void)refitPreview
+{
+    if (_fullScreen || _inlineCell == nil)
+        return;
+
+    // settle the container's bounds first - the emulator centers the picture inside
+    // them, so measuring a stale size leaves the game off to one side
+    [_inlineCell layoutIfNeeded];
+
+    if (EmulatorController.sharedInstance.embeddedView != _inlineCell.screenContainer)
+        EmulatorController.sharedInstance.embeddedView = _inlineCell.screenContainer;
+    else
+        [EmulatorController.sharedInstance changeUI];
+}
+
 - (void)previewContainerDidResize:(AttractModeCell*)cell
 {
-    if (_inlineCell != cell || _fullScreen || !_running)
+    if (_inlineCell != cell || _fullScreen)
         return;
 
     AttractLog(@"PREVIEW RESIZED, REFITTING");
@@ -721,16 +817,6 @@ void AttractLog(NSString* format, ...)
     [_bag removeAllObjects];
 }
 
-// only consulted for the random pool - a game the user put in their own list is their
-// business. NOTE find_category can join several categories with commas, hence contains.
-- (BOOL)isAdult:(GameInfo*)game
-{
-    if ([[Options alloc] init].attractHideAdult == 0)
-        return NO;
-
-    return [game.gameCategory rangeOfString:ATTRACT_ADULT_CATEGORY options:NSCaseInsensitiveSearch].location != NSNotFound;
-}
-
 - (BOOL)isMechanical:(GameInfo*)game
 {
     NSString* category = game.gameCategory;
@@ -780,8 +866,6 @@ void AttractLog(NSString* format, ...)
     if ([_badGames containsObject:game.gameName])
         return NO;
     if ([self isMechanical:game])
-        return NO;
-    if ([self isAdult:game])
         return NO;
 
     return YES;
@@ -912,6 +996,14 @@ void AttractLog(NSString* format, ...)
         return;
 
     _inlineCell = cell;
+
+    // the emulator centers the picture inside embeddedView.bounds, so those bounds have
+    // to be final before we hand the view over - a cell fresh out of the reuse queue,
+    // or one caught mid rotation, still has its estimated size and the game ends up
+    // centered for a width it no longer has
+    [cell layoutIfNeeded];
+
+    EmulatorController.sharedInstance.embeddedViewFillsScreen = NO;
     EmulatorController.sharedInstance.embeddedView = cell.screenContainer;
 
     if (!_running)
@@ -1021,14 +1113,19 @@ void AttractLog(NSString* format, ...)
     if (_paused)
         [self resumePreview];
 
+    EmulatorController* emu = EmulatorController.sharedInstance;
+    GameInfo* game = _currentGame;
+    NSTimeInterval remaining = self.remainingGameTime;
+
+    // where the preview sits right now, in the emulator's own coordinates, so we can
+    // grow the game out of it. captured before we let go of the cell.
+    UIView* preview = _inlineCell.screenContainer;
+    CGRect fromRect = (preview.window != nil) ? [preview convertRect:preview.bounds toView:emu.view] : CGRectZero;
+
     _fullScreen = YES;
     _inlineCell = nil;
     [_idleTimer invalidate];
     _idleTimer = nil;
-
-    EmulatorController* emu = EmulatorController.sharedInstance;
-    GameInfo* game = _currentGame;
-    NSTimeInterval remaining = self.remainingGameTime;
 
     // if nothing was playing inline (cell offscreen, or just enabled) start one now
     if (!_running) {
@@ -1039,10 +1136,67 @@ void AttractLog(NSString* format, ...)
         return;
     }
 
-    [emu dismissViewControllerAnimated:YES completion:^{
-        emu.embeddedView = nil;
+    // hold on to a picture of the ROM browser so it can fade out behind the zoom
+    // rather than snapping away the instant we dismiss it
+    UIView* snapshot = [emu.presentedViewController.view snapshotViewAfterScreenUpdates:NO];
+
+    [emu dismissViewControllerAnimated:NO completion:^{
+        if (snapshot != nil) {
+            snapshot.frame = emu.view.bounds;
+            [emu.view addSubview:snapshot];
+        }
+        [self zoomUpFrom:fromRect game:game remaining:remaining behind:snapshot];
+    }];
+}
+
+// grow the running game from the preview's old rect out to the whole screen. the
+// emulator keeps playing throughout - all that moves is where it draws.
+- (void)zoomUpFrom:(CGRect)fromRect game:(GameInfo*)game remaining:(NSTimeInterval)remaining behind:(UIView*)snapshot
+{
+    EmulatorController* emu = EmulatorController.sharedInstance;
+
+    void (^finish)(void) = ^{
+        [snapshot removeFromSuperview];
         [self showOverlayForGame:game];
         [self updateChromeForGame:game duration:remaining];
+    };
+
+    // nothing sensible to grow out of (the cell was off screen), just swap over
+    if (CGRectIsEmpty(fromRect) || CGRectIsEmpty(emu.view.bounds)) {
+        emu.embeddedView = nil;
+        return finish();
+    }
+
+    // NOTE this container stays the render target for as long as we are full screen.
+    // handing the screen view back to emu.view afterwards would mean a second changeUI
+    // with different metrics (embeddedView forces g_device_is_fullscreen off), and the
+    // picture would jump at the end of the animation.
+    UIView* zoom = [[UIView alloc] initWithFrame:emu.view.bounds];
+    zoom.backgroundColor = UIColor.blackColor;
+    zoom.clipsToBounds = YES;
+    [emu.view addSubview:zoom];
+
+    _zoomView = zoom;
+    emu.embeddedViewFillsScreen = YES;  // keep the fullscreen layout, no bezel or control area
+    emu.embeddedView = zoom;            // sizes the game to the *final* rect straight away
+
+    // then scrunch the whole thing back down onto where the preview was
+    CGRect bounds = emu.view.bounds;
+    zoom.transform = CGAffineTransformMakeScale(fromRect.size.width / CGRectGetWidth(bounds),
+                                                fromRect.size.height / CGRectGetHeight(bounds));
+    zoom.center = CGPointMake(CGRectGetMidX(fromRect), CGRectGetMidY(fromRect));
+
+    [UIView animateWithDuration:ATTRACT_ZOOM_DURATION delay:0.0
+                        options:UIViewAnimationOptionCurveEaseInOut
+                     animations:^{
+        zoom.transform = CGAffineTransformIdentity;
+        zoom.center = CGPointMake(CGRectGetMidX(bounds), CGRectGetMidY(bounds));
+        snapshot.alpha = 0.0;
+    } completion:^(BOOL finished) {
+        // now that the transform is back to identity it is safe to let the container
+        // follow the emulator view's bounds
+        zoom.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+        finish();
     }];
 }
 
@@ -1057,7 +1211,6 @@ void AttractLog(NSString* format, ...)
 
     AttractLog(@"NEXT %@ (\"%@\") - %d left in bag", game.gameName, game.gameTitle, (int)_bag.count);
 
-    _failureCount = 0;
     [self updateChromeForGame:game duration:self.gameDuration];
     [self playGame:game];
 }
@@ -1129,8 +1282,10 @@ void AttractLog(NSString* format, ...)
         return [self skipSoon];
     }
 
-    if (!broken)
+    if (!broken) {
+        _failureCount = 0;      // something finally ran
         return;
+    }
 
     AttractLog(@"%@ FLAGGED NOT_WORKING BY MAME, SKIPPING", name);
     [_badGames addObject:name];
@@ -1158,16 +1313,12 @@ void AttractLog(NSString* format, ...)
             AttractLog(@"TOO MANY FAILURES, GIVING UP");
             return [self stop];
         }
-
-        // dont reset the failure counter the way skipToNextGame would
-        GameInfo* game = [self nextGameInfo];
-        if (game == nil)
-            return [self stop];
-        [self updateChromeForGame:game duration:self.gameDuration];
-        return [self playGame:game];
     }
 
-    [self skipToNextGame];
+    // NOTE deferred, not immediate. we get here from chooseGame:, which MAME calls
+    // from inside the select-game menu it is still building - asking it to exit right
+    // then gets dropped, and the next game never starts.
+    [self skipSoon];
 }
 
 - (void)stop
@@ -1220,7 +1371,13 @@ void AttractLog(NSString* format, ...)
     _currentGame = nil;
 
     _inlineCell = nil;
+
+    // order matters - clearing embeddedView re-parents the screen view back to the
+    // emulator's own view, and only then is the zoom container safe to drop
+    EmulatorController.sharedInstance.embeddedViewFillsScreen = NO;
     EmulatorController.sharedInstance.embeddedView = nil;
+    [_zoomView removeFromSuperview];
+    _zoomView = nil;
 
     [_gameTimer invalidate];
     _gameTimer = nil;
@@ -1280,6 +1437,7 @@ void AttractLog(NSString* format, ...)
 
 - (void)updateOverlayForGame:(GameInfo*)game duration:(NSTimeInterval)duration
 {
+    _overlay.game = game;
     _overlay.titleLabel.text = game.gameTitle.length != 0 ? game.gameTitle : game.gameDescription;
 
     NSMutableArray* parts = [[NSMutableArray alloc] init];

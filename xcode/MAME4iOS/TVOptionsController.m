@@ -44,7 +44,7 @@
     if ( section == kListsSection ) {
         return 1;
     } else if ( section == kAttractSection ) {
-        return 4;
+        return 3;
     } else if ( section == kFilterSection ) {
         return 3;
     } else if ( section == kScreenSection ) {
@@ -238,9 +238,6 @@
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.detailTextLabel.text = op.attractSource ?: ATTRACT_SOURCE_RANDOM;
         } else if ( indexPath.row == 2 ) {
-            cell.textLabel.text = @"Hide Adult Games";
-            cell.accessoryView = [self optionSwitchForKey:@"attractHideAdult"];
-        } else if ( indexPath.row == 3 ) {
             cell.textLabel.text = @"Game Length";
             cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
             cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
@@ -321,7 +318,7 @@
             ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractSource" list:Options.arrayAttractSource title:cell.textLabel.text];
             [[self navigationController] pushViewController:listController animated:YES];
         }
-        if ( indexPath.row == 3 ) {
+        if ( indexPath.row == 2 ) {
             ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
             [[self navigationController] pushViewController:listController animated:YES];
         }

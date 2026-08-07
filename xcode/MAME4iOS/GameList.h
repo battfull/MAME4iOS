@@ -66,4 +66,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)initWithList:(GameList*)list;
 @end
 
+// pick which lists a game belongs to. stays up while you tick things on and off,
+// unlike an action sheet, and reports back on Done so the browser can refresh.
+@interface GameListPickerController : UITableViewController
+- (instancetype)initWithGame:(GameInfo*)game;
+@property (nonatomic, copy, nullable) void (^didFinish)(void);
+@end
+
 NS_ASSUME_NONNULL_END

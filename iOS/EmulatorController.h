@@ -182,6 +182,11 @@ extern NSArray* g_import_file_types;
 // Attract Mode to show a live preview inside the ROM browser.
 @property (readwrite,strong)  UIView *embeddedView;
 
+// set when embeddedView covers the whole screen, so the fullscreen layout is kept.
+// without it an embedded view always falls back to the windowed arrangement, which
+// puts the game up top with the touch control area below it.
+@property (readwrite,assign)  BOOL embeddedViewFillsScreen;
+
 // run a game without touching whatever is presented - the ROM browser stays up while
 // Attract Mode plays into its embeddedView. see -playGame: for the normal path.
 - (void)playGameEmbedded:(GameInfo*)game;

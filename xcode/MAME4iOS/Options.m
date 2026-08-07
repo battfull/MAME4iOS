@@ -189,7 +189,6 @@
         _attractMode = 1;
         _attractSource = ATTRACT_SOURCE_RANDOM;
         _attractDuration = 0;
-        _attractHideAdult = 0;
         _attractPinned = 0;
     }
     else
@@ -281,7 +280,6 @@
         else if ([_attractSource isEqualToString:@"0"])
             _attractSource = ATTRACT_SOURCE_RANDOM;
         _attractDuration = [[optionsDict objectForKey:@"attractDuration"] intValue];
-        _attractHideAdult = [[optionsDict objectForKey:@"attractHideAdult"] intValue];
         _attractPinned = [[optionsDict objectForKey:@"attractPinned"] intValue];
     }
     
@@ -364,7 +362,6 @@
                              [NSString stringWithFormat:@"%d", _attractMode], @"attractMode",
                              _attractSource ?: ATTRACT_SOURCE_RANDOM, @"attractSource",
                              [NSString stringWithFormat:@"%d", _attractDuration], @"attractDuration",
-                             [NSString stringWithFormat:@"%d", _attractHideAdult], @"attractHideAdult",
                              [NSString stringWithFormat:@"%d", _attractPinned], @"attractPinned",
                              nil];
 }

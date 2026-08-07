@@ -428,23 +428,6 @@
         }
       }
     },
-    "⏭ Next" : {
-      "comment" : "Attract Mode next game button",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⏭ 次へ"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "⏭ 下一个"
-          }
-        }
-      }
-    },
     "▶ Play This Game" : {
       "comment" : "Attract Mode keep playing button",
       "localizations" : {
@@ -690,6 +673,7 @@
     },
     "Add to %@" : {
       "comment" : "add to a named list",
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {
@@ -717,22 +701,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "添加到收藏"
-          }
-        }
-      }
-    },
-    "Add to New List…" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "新規リストに追加…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "添加到新列表…"
           }
         }
       }
@@ -1887,23 +1855,6 @@
         }
       }
     },
-    "Hide Adult Games" : {
-      "comment" : "Settings: Attract Mode Section: skip the Adult category when picking at random",
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "アダルトゲームを非表示"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "隐藏成人游戏"
-          }
-        }
-      }
-    },
     "Hide BIOS" : {
       "comment" : "Filter option to hide BIOS files from the list",
       "localizations" : {
@@ -2190,6 +2141,23 @@
         }
       }
     },
+    "Lists…" : {
+      "comment" : "open the list picker for a game",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リスト…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "列表…"
+          }
+        }
+      }
+    },
     "Load" : {
       "comment" : "HUD Load",
       "localizations" : {
@@ -2203,6 +2171,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "载入"
+          }
+        }
+      }
+    },
+    "Loading…" : {
+      "comment" : "shown while the ROM list is being built",
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "読み込み中…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在加载…"
           }
         }
       }
@@ -2866,6 +2851,7 @@
     },
     "Remove from %@" : {
       "comment" : "remove from a named list",
+      "extractionState" : "stale",
       "localizations" : {
         "ja" : {
           "stringUnit" : {

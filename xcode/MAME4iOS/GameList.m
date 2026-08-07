@@ -612,3 +612,133 @@
 }
 
 @end
+
+#pragma mark - list picker
+
+@implementation GameListPickerController
+{
+    GameInfo* _game;
+    NSArray<GameList*>* _lists;
+}
+
+- (instancetype)initWithGame:(GameInfo*)game
+{
+    self = [super initWithStyle:UITableViewStyleGrouped];
+    _game = game;
+    return self;
+}
+
+- (void)viewDidLoad
+{
+    [super viewDidLoad];
+
+    self.title = NSLocalizedString(@"Lists", @"");
+    self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithBarButtonSystemItem:UIBarButtonSystemItemDone
+                                                                                          target:self
+                                                                                          action:@selector(done)];
+#if TARGET_OS_TV
+    UITapGestureRecognizer* tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(done)];
+    tap.allowedPressTypes = @[@(UIPressTypeMenu)];
+    [self.view addGestureRecognizer:tap];
+#endif
+}
+
+- (void)viewWillAppear:(BOOL)animated
+{
+    [super viewWillAppear:animated];
+    [self reload];
+}
+
+- (void)reload
+{
+    NSMutableArray* lists = [[NSMutableArray alloc] init];
+
+    // Favorites has its own action in the game menu, with extras this does not need
+    for (GameList* list in [GameList allLists]) {
+        if (!list.isFavorites)
+            [lists addObject:list];
+    }
+
+    _lists = lists;
+    [self.tableView reloadData];
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView
+{
+    return 2;   // the lists, then New List
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section
+{
+    return section == 0 ? _lists.count : 1;
+}
+
+- (NSString *)tableView:(UITableView *)tableView titleForHeaderInSection:(NSInteger)section
+{
+    return section == 0 ? (_game.gameTitle ?: @"") : @"";
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    UITableViewCell* cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleValue1 reuseIdentifier:nil];
+
+    if (indexPath.section == 1) {
+        cell.textLabel.text = NSLocalizedString(@"New List…", @"Settings: create a list");
+        cell.textLabel.textColor = self.view.tintColor;
+        return cell;
+    }
+
+    GameList* list = _lists[indexPath.row];
+    cell.textLabel.text = list.name;
+    cell.accessoryType = [list containsGame:_game] ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath
+{
+    [tableView deselectRowAtIndexPath:indexPath animated:YES];
+
+    if (indexPath.section == 1)
+        return [self promptForNewList];
+
+    // toggle in place - the whole point of this screen over an action sheet
+    GameList* list = _lists[indexPath.row];
+
+    if ([list containsGame:_game])
+        [list removeGame:_game];
+    else
+        [list addGame:_game];
+
+    [tableView reloadRowsAtIndexPaths:@[indexPath] withRowAnimation:UITableViewRowAnimationNone];
+}
+
+- (void)promptForNewList
+{
+    UIAlertController* alert = [UIAlertController alertControllerWithTitle:NSLocalizedString(@"New List", @"")
+                                                                  message:nil
+                                                           preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField* field) {
+        field.placeholder = NSLocalizedString(@"List Name", @"");
+    }];
+
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Create", @"") style:UIAlertActionStyleDefault handler:^(UIAlertAction* action) {
+        GameList* list = [GameList createListNamed:alert.textFields.firstObject.text ?: @""];
+        [list addGame:self->_game];
+        [self reload];
+    }]];
+    [alert addAction:[UIAlertAction actionWithTitle:NSLocalizedString(@"Cancel", @"") style:UIAlertActionStyleCancel handler:nil]];
+
+    [self presentViewController:alert animated:YES completion:nil];
+}
+
+- (void)done
+{
+    void (^didFinish)(void) = self.didFinish;
+
+    [self dismissViewControllerAnimated:YES completion:^{
+        if (didFinish != nil)
+            didFinish();
+    }];
+}
+
+@end

@@ -315,12 +315,6 @@
                }
                case 2:
                {
-                   cell.textLabel.text = NSLocalizedString(@"Hide Adult Games", @"Settings: Attract Mode Section: skip the Adult category when picking at random");
-                   cell.accessoryView = [self optionSwitchForKey:@"attractHideAdult"];
-                   break;
-               }
-               case 3:
-               {
                    cell.textLabel.text = NSLocalizedString(@"Game Length", @"Settings: Attract Mode Section: how long each game plays");
                    cell.accessoryType = UITableViewCellAccessoryDisclosureIndicator;
                    cell.detailTextLabel.text = [Options.arrayAttractDuration localizedOptionAtIndex:op.attractDuration];
@@ -528,7 +522,7 @@
           case kVectorSection: return 2;
           case kMiscSection: return 9;
           case kListsSection: return 1;
-          case kAttractSection: return 4;
+          case kAttractSection: return 3;
           case kFilterSection: return 3;
           case kImportSection: return 4;
 #if !TARGET_APPSTORE
@@ -619,7 +613,7 @@
                 ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractSource" list:Options.arrayAttractSource title:cell.textLabel.text];
                 [[self navigationController] pushViewController:listController animated:YES];
             }
-            if (row==3) {
+            if (row==2) {
                 ListOptionController *listController = [[ListOptionController alloc] initWithKey:@"attractDuration" list:Options.arrayAttractDuration title:cell.textLabel.text];
                 [[self navigationController] pushViewController:listController animated:YES];
             }

@@ -295,7 +295,7 @@ static char g_mame_options[1024];           // extra options to pass to MAME
 static char g_mame_game_error[64+256];      // name of the system/game that got an error.
 static char g_mame_output_text[4096];       // any ERROR, WARNING, or INFO text output while running game
 static BOOL g_mame_warning_shown = FALSE;
-static BOOL g_attract_dismiss_keys = FALSE; // TRUE when Attract Mode is booting a real game, see m4i_input_init
+static BOOL g_dismiss_startup_screens = FALSE;  // TRUE when we should clear MAME's startup screens ourselves, see m4i_input_init
 static BOOL g_mame_benchmark = FALSE;       // if TRUE run game in benchmark mode (-bench 90)
 static BOOL g_mame_first_boot = FALSE;      // TRUE the first time MAME runs
 static BOOL g_no_roms_found = FALSE;
@@ -623,10 +623,13 @@ void* app_Thread_Start(void* args)
         if (g_attract_mode)
             AttractLog(@"RUN MAME game='%s' system='%s' type='%s'", mame_game, mame_system, mame_type);
 
-        // only auto-dismiss startup screens when we are booting an actual game. with no
-        // game MAME sits in the select-game menu, where ENTER is UI_SELECT and would
-        // launch whatever machine happens to be under the cursor.
-        g_attract_dismiss_keys = g_attract_mode && running_game;
+        // clear MAME's startup screens for the user when they have asked not to see
+        // info/warnings, and always in Attract Mode where nobody is there to press a key.
+        //
+        // only when booting an actual game - with no game MAME sits in the select-game
+        // menu, where ENTER is UI_SELECT and would launch whatever machine happens to be
+        // under the cursor.
+        g_dismiss_startup_screens = running_game && (g_attract_mode || !g_pref_showINFO);
 
         if (run_mame(mame_system, mame_type, mame_game, mame_options) != 0 && running_game) {
             if (mame_system[0] == 0)
@@ -928,6 +931,7 @@ void m4i_game_stop(void)
 
 @synthesize externalView;
 @synthesize embeddedView;
+@synthesize embeddedViewFillsScreen;
 @synthesize stick_radio;
 
 #if TARGET_OS_IOS
@@ -2087,6 +2091,13 @@ ButtonPressType input_debounce(unsigned long pad_status, CGPoint stick) {
     [super viewWillLayoutSubviews];
     if (!CGSizeEqualToSize(layoutSize, self.view.bounds.size)) {
         layoutSize = self.view.bounds.size;
+
+        // a full screen embedded container (Attract Mode) has to follow us before
+        // changeUI measures it, or the game stays centered for the old size. we run
+        // ahead of the layout pass that would resize it, so do it by hand.
+        if (embeddedView != nil && embeddedViewFillsScreen)
+            embeddedView.frame = self.view.bounds;
+
         [self loadHUD];
         [self changeUI];
     }
@@ -3146,8 +3157,8 @@ void m4i_input_init(myosd_input_state* myosd, size_t input_size) {
 
     push_mame_flush();
 
-    // Attract Mode: nobody is here to press a key, so clear MAME's startup screens
-    // ourselves - modern MAME shows the warnings screen even with -skip_gameinfo.
+    // clear MAME's startup screens - it shows the warnings screen even with
+    // -skip_gameinfo, so skipping the info screen alone is not enough.
     // handler_messagebox_anykey takes *any* key, so send the one with the least
     // baggage: ENTER is UI_SELECT, and otherwise only P3 Button 3. do NOT send
     // letter keys here - O is the coin Door Interlock, which clears the bookkeeping
@@ -3155,8 +3166,8 @@ void m4i_input_init(myosd_input_state* myosd, size_t input_size) {
     // NOTE this has to come after the flush above, which would eat the keys, and it
     // must only happen when booting a real game - this is called for the select-game
     // menu too, where ENTER launches whatever machine is under the cursor.
-    if (g_attract_dismiss_keys) {
-        g_attract_dismiss_keys = FALSE;
+    if (g_dismiss_startup_screens) {
+        g_dismiss_startup_screens = FALSE;
         push_mame_keys(MYOSD_KEY_ENTER, MYOSD_KEY_ENTER, 0, 0);
     }
 
@@ -3490,7 +3501,9 @@ void m4i_input_poll(myosd_input_state* myosd, size_t input_size) {
     if (g_joy_used == JOY_USED_GAMEPAD && g_pref_full_screen_joy)
          g_device_is_fullscreen = TRUE;
 
-    if (externalView != nil || embeddedView != nil)
+    // an embedded preview lives in a small view, so it uses the windowed layout - but
+    // Attract Mode's full screen container covers everything and should stay fullscreen
+    if (externalView != nil || (embeddedView != nil && !embeddedViewFillsScreen))
         g_device_is_fullscreen = FALSE;
     
     g_direct_mouse_enable = TRUE;
@@ -6302,7 +6315,6 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
     ChooseGameController* choose = [[ChooseGameController alloc] init];
     choose.backgroundImage = [self loadTileImage:@"ui-background.png"];
     choose.hideConsoles = g_pref_filter_bios;
-    [choose setGameList:games];
     change_pause(PAUSE_INPUT);
     choose.selectGameCallback = ^(GameInfo* game) {
         if (self.presentedViewController.isBeingDismissed)
@@ -6334,7 +6346,13 @@ NSString* getGamepadSymbol(GCExtendedGamepad* gamepad, GCControllerElement* elem
     if (@available(iOS 13.0, tvOS 13.0, *)) {
         nav.modalInPresentation = YES;    // disable iOS 13 swipe to dismiss...
     }
-    [self presentViewController:nav animated:YES completion:nil];
+    // hand over the games *after* we are on screen. building the list means scanning
+    // the snapshot and software directories and sorting thousands of entries, which
+    // is enough to sit on the emulator's logo for a beat if we do it first. the
+    // browser shows a spinner until this lands.
+    [self presentViewController:nav animated:YES completion:^{
+        [choose setGameList:games];
+    }];
 }
 
 #pragma mark UIEvent handling for button presses
