@@ -80,7 +80,13 @@ extension UITableViewController {
     }
     private func moveSelection(_ dir:Int) {
         guard var indexPath = tableView.indexPathForSelectedRow else {
-            return select(IndexPath(row:0, section:0))
+            // find first non-empty section
+            for section in 0...maxSection() {
+                if tableView.numberOfRows(inSection: section) > 0 {
+                    return select(IndexPath(row: 0, section: section))
+                }
+            }
+            return
         }
         if dir == -1 && indexPath.row == 0 && indexPath.section != 0 {
             indexPath.section -= 1
