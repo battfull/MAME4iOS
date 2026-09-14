@@ -28,6 +28,19 @@ jobs:
             -project MAME4iOS.xcodeproj \
             -scheme "MAME4iOS Release" \
             -configuration Release \
-            -destination "platform=macOS,variant=Mac Catalyst" \
-            CODE_SIGNING_ALLOWED=NO \
-            build
+                 -destination "platform=macOS,variant=Mac Catalyst" \
+                 CODE_SIGNING_ALLOWED=NO \
+                 -derivedDataPath "$GITHUB_WORKSPACE/build" \
+                 build
+
+           - name: Package macOS app
+             run: |
+               APP_PATH=$(find build/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)
+               test -n "$APP_PATH"
+               ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" MAME4iOS-macOS.zip
+
+           - name: Upload macOS app
+             uses: actions/upload-artifact@v4
+             with:
+               name: MAME4iOS-macOS
+               path: MAME4iOS-macOS.zip
