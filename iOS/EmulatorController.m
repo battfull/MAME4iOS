@@ -778,7 +778,7 @@ void m4i_game_list(myosd_game_info* game_info, int game_count)
             static NSSet<NSString*>* excluded_bundled_games = nil;
             static dispatch_once_t onceToken;
             dispatch_once(&onceToken, ^{
-                excluded_bundled_games = [NSSet setWithArray:@[@"pongf", @"pongd", @"rebound", @"breakout"]];
+                excluded_bundled_games = [NSSet setWithArray:@[@"pong", @"pongf", @"pongd", @"rebound", @"breakout"]];
             });
             if ([excluded_bundled_games containsObject:@(game_info[i].name)])
                 continue;
