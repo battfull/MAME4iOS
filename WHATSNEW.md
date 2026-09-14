@@ -60,12 +60,7 @@
 
 ## ROMless Arcade Machines
 
-Name        |Description
-------------|-----------------------
-pongf       |Pong (Rev E) [TTL]        
-pongd       |Pong Doubles [TTL]        
-rebound     |Rebound (Rev B) [TTL]   
-breakout    |Breakout [TTL]     
+This fork does not include bundled romless arcade games.
 
 ## ROMless Console Machines
 

@@ -774,8 +774,13 @@ void m4i_game_list(myosd_game_info* game_info, int game_count)
             NSString *driver = [@(game_info[i].source_file ?: "").lastPathComponent stringByDeletingPathExtension];
 
 #if TARGET_APPSTORE
-            // App Store release: don't include pong/breakout to avoid copyright issues
-            if ( [driver isEqualToString:@"pong"] || [driver isEqualToString:@"breakout"])
+            // App Store release: don't include bundled Atari romless games to avoid copyright issues.
+            static NSSet<NSString*>* excluded_bundled_games = nil;
+            static dispatch_once_t onceToken;
+            dispatch_once(&onceToken, ^{
+                excluded_bundled_games = [NSSet setWithArray:@[@"pongf", @"pongd", @"rebound", @"breakout"]];
+            });
+            if ([excluded_bundled_games containsObject:@(game_info[i].name)])
                 continue;
 #endif
           

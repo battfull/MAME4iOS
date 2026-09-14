@@ -1,0 +1,33 @@
+name: macOS Catalyst Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+      - main
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Download macOS MAME library
+        run: ./get-libmame.sh mac
+
+      - name: Build macOS Catalyst app
+        working-directory: xcode/MAME4iOS
+        run: |
+          xcodebuild \
+            -project MAME4iOS.xcodeproj \
+            -scheme "MAME4iOS Release" \
+            -configuration Release \
+            -destination "platform=macOS,variant=Mac Catalyst" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
